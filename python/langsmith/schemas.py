@@ -375,6 +375,10 @@ class RunWithAnnotationQueueInfo(RunBase):
     """The last time this run was reviewed."""
     added_at: Optional[datetime] = None
     """The time this run was added to the queue."""
+    effective_added_at: Optional[str] = None
+    """The effective time this run was added to the queue."""
+    queue_run_id: UUID
+    """The ID of the run in the queue."""
 
 
 class FeedbackSourceBase(BaseModel):
@@ -626,6 +630,16 @@ class AnnotationQueue(BaseModel):
         updated_at (datetime, optional): The last update timestamp of the annotation
              queue. Defaults to the current UTC time.
         tenant_id (UUID): The ID of the tenant associated with the annotation queue.
+        default_dataset (Optional[UUID], optional): The default dataset ID for the
+            annotation queue. Defaults to None.
+        num_reviewers_per_item (Optional[int], optional): The number of reviewers
+            per item. Defaults to None.
+        enable_reservations (Optional[bool], optional): Whether reservations are
+            enabled. Reserved runs will only be visible by up to
+            num_reviewers_per_item at a given time. Defaults to None.
+        reservation_minutes (Optional[int], optional): The number of minutes a
+            reservation is valid. Defaults to None.
+        total_runs (Optional[int], optional): The total number of runs in the queue.
     """
 
     id: UUID
@@ -634,6 +648,11 @@ class AnnotationQueue(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     tenant_id: UUID
+    default_dataset: Optional[UUID] = None
+    num_reviewers_per_item: Optional[int] = None
+    reservation_minutes: Optional[int] = None
+    enable_reservations: Optional[bool] = None
+    total_runs: Optional[int] = None
 
 
 class BatchIngestConfig(TypedDict, total=False):

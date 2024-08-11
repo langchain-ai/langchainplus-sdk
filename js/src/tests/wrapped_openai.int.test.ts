@@ -99,7 +99,6 @@ test.concurrent("chat.completions", async () => {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   for await (const _ of patchedStreamToBreak) {
-    console.log(_);
     break;
   }
 
@@ -451,8 +450,6 @@ test.skip("with initialization time config", async () => {
     // @ts-expect-error Should type check streamed output
     const _test = chunk.invalidPrompt;
   }
-
-  console.log(patchedChoices);
 });
 
 test.skip("no tracing with env var unset", async () => {
@@ -466,7 +463,6 @@ test.skip("no tracing with env var unset", async () => {
     model: "gpt-3.5-turbo",
   });
   expect(patched).toBeDefined();
-  console.log(patched);
 });
 
 test("wrapping same instance", async () => {

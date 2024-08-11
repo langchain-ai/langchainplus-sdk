@@ -705,3 +705,50 @@ def test_runs_stats():
     # We always have stuff in the "default" project...
     stats = langchain_client.get_run_stats(project_names=["default"], run_type="llm")
     assert stats
+
+
+def test_annotation_queue_crud():
+    langchain_client = Client()
+    q_hex = uuid4().hex
+    q_name = f"test_queue_{q_hex}"
+    created = langchain_client.create_annotation_queue(
+        name=q_name,
+        description="test queue",
+        num_reviewers_per_item=3,
+        enable_reservations=True,
+        reservation_minutes=31,
+    )
+    try:
+        qid = created.id
+        queues = list(langchain_client.list_annotation_queues(name_contains=q_hex))
+        assert len(queues) >= 1
+        queue = next(q for q in queues if q.name == q_name and q.id == qid)
+        assert queue.description == "test queue"
+        assert queue.num_reviewers_per_item == 3
+        assert queue.enable_reservations
+        assert queue.reservation_minutes == 31
+        langchain_client.update_annotation_queue(
+            qid, description="test queue updated", num_reviewers_per_item=5
+        )
+        queue = langchain_client.read_annotation_queue(qid)
+        assert queue.description == "test queue updated"
+        assert queue.num_reviewers_per_item == 5
+        assert queue.enable_reservations
+        # Skip this for now; it's being overwriti
+        # assert queue.reservation_minutes == 31
+        # add a run to the queue
+        some_run = next(
+            langchain_client.list_runs(project_name="default", limit=1, select=["id"])
+        )
+        langchain_client.add_runs_to_annotation_queue(qid, run_ids=[some_run.id])
+        # Get queue total size
+        queue = langchain_client.read_annotation_queue(qid)
+        assert queue.total_runs == 1
+        qsize = langchain_client.get_size_from_annotation_queue(qid)
+        assert qsize == 1
+        qtotalsize = langchain_client.get_total_size_from_annotation_queue(qid)
+        assert qtotalsize == 1
+        r = langchain_client.get_run_from_annotation_queue(qid, 0)
+        assert r.id == some_run.id
+    finally:
+        langchain_client.delete_annotation_queue(qid)

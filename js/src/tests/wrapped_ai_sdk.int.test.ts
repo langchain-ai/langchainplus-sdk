@@ -15,7 +15,6 @@ test("AI SDK generateText", async () => {
     model: modelWithTracing,
     prompt: "Write a vegetarian lasagna recipe for 4 people.",
   });
-  console.log(text);
 });
 
 test("AI SDK generateText with a tool", async () => {
@@ -36,7 +35,7 @@ test("AI SDK generateText with a tool", async () => {
     },
     maxToolRoundtrips: 2,
   });
-  console.log(text);
+  expect(text).toBeDefined();
 });
 
 test("AI SDK generateObject", async () => {
@@ -48,7 +47,6 @@ test("AI SDK generateObject", async () => {
       ingredients: z.array(z.string()),
     }),
   });
-  console.log(object);
 });
 
 test("AI SDK streamText", async () => {
@@ -58,7 +56,7 @@ test("AI SDK streamText", async () => {
     prompt: "Write a vegetarian lasagna recipe for 4 people.",
   });
   for await (const chunk of textStream) {
-    console.log(chunk);
+    expect(chunk).toBeDefined();
   }
 });
 
@@ -72,6 +70,6 @@ test("AI SDK streamObject", async () => {
     }),
   });
   for await (const chunk of partialObjectStream) {
-    console.log(chunk);
+    expect(chunk).toBeDefined();
   }
 });
