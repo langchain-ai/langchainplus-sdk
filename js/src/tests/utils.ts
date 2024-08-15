@@ -39,12 +39,13 @@ export async function pollRunsUntilCount(
   client: Client,
   projectName: string,
   count: number,
-  timeout?: number
+  timeout?: number,
+  filter?: string
 ): Promise<void> {
   await waitUntil(
     async () => {
       try {
-        const runs = await toArray(client.listRuns({ projectName }));
+        const runs = await toArray(client.listRuns({ projectName, filter }));
         return runs.length === count;
       } catch (e) {
         return false;

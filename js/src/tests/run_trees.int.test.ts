@@ -10,18 +10,15 @@ import {
   pollRunsUntilCount,
   sanitizePresignedUrls,
 } from "./utils.js";
+import { v4 as uuidv4 } from "uuid";
 
 test.concurrent(
   "Test post and patch run",
   async () => {
     const projectName = `__test_run_tree`;
     const langchainClient = new Client({ timeout_ms: 30000 });
-    try {
-      await langchainClient.readProject({ projectName });
-      await langchainClient.deleteProject({ projectName });
-    } catch (e) {
-      // Pass
-    }
+    const runMeta = uuidv4();
+
     const parentRunConfig: RunTreeConfig = {
       name: "parent_run",
       run_type: "chain",
@@ -29,6 +26,7 @@ test.concurrent(
       project_name: projectName,
       serialized: {},
       client: langchainClient,
+      metadata: { test_run: runMeta },
     };
 
     const parent_run = new RunTree(parentRunConfig);
@@ -42,6 +40,7 @@ test.concurrent(
       name: "child_run",
       run_type: "llm",
       inputs: { text: "hello world" },
+      metadata: { test_run: runMeta },
     });
     expect(child_llm_run.dotted_order).toEqual(
       parent_run.dotted_order +
@@ -59,6 +58,7 @@ test.concurrent(
       name: "child_chain_run",
       run_type: "chain",
       inputs: { text: "hello world" },
+      metadata: { test_run: runMeta },
     });
     await child_chain_run.postRun();
 
@@ -66,6 +66,7 @@ test.concurrent(
       name: "grandchild_chain_run",
       run_type: "chain",
       inputs: { text: "hello world" },
+      metadata: { test_run: runMeta },
     });
     await grandchild_chain_run.postRun();
     await grandchild_chain_run.end({ output: ["Hi"] });
@@ -76,6 +77,7 @@ test.concurrent(
       name: "child_tool_run",
       run_type: "tool",
       inputs: { text: "hello world" },
+      metadata: { test_run: runMeta },
     });
     await child_tool_run.postRun();
     await child_tool_run.end({ output: ["Hi"] });
@@ -85,10 +87,13 @@ test.concurrent(
     await parent_run.end({ output: ["Hi"] });
     await parent_run.patchRun();
 
+    const filter = `and(eq(metadata_key, "test_run"), eq(metadata_value, "${runMeta}"))`;
     await waitUntil(
       async () => {
         try {
-          const runs = await toArray(langchainClient.listRuns({ projectName }));
+          const runs = await toArray(
+            langchainClient.listRuns({ projectName, filter })
+          );
           return runs.length === 5;
         } catch (e) {
           return false;
@@ -97,7 +102,9 @@ test.concurrent(
       30_000, // Wait up to 30 seconds
       3000 // every 3 second
     );
-    const runs = await toArray(langchainClient.listRuns({ projectName }));
+    const runs = await toArray(
+      langchainClient.listRuns({ projectName, filter })
+    );
     expect(runs.length).toEqual(5);
     const runMap = new Map(runs.map((run) => [run.name, run]));
     expect(runMap.get("child_run")?.parent_run_id).toEqual(
@@ -116,6 +123,7 @@ test.concurrent(
 
     const traceRunsIter = langchainClient.listRuns({
       traceId: runs[0].trace_id,
+      filter,
     });
     const traceRuns = await toArray(traceRunsIter);
     expect(traceRuns.length).toEqual(5);
@@ -131,7 +139,6 @@ test.concurrent(
       )
     );
     expect(sortedRuns).toEqual(sortedTraceRuns);
-    await langchainClient.deleteProject({ projectName });
   },
   120_000
 );
@@ -143,65 +150,62 @@ test.concurrent(
       "__My JS Tracer Project - test_list_runs_multi_project",
       "__My JS Tracer Project - test_list_runs_multi_project2",
     ];
+    const runMeta = uuidv4();
+    const langchainClient = new Client({ timeout_ms: 30000 });
 
-    try {
-      const langchainClient = new Client({ timeout_ms: 30000 });
+    const parentRunConfig: RunTreeConfig = {
+      name: "parent_run",
+      inputs: { text: "hello world" },
+      project_name: projectNames[0],
+      client: langchainClient,
+      metadata: { test_run: runMeta },
+    };
 
-      for (const project of projectNames) {
-        if (await langchainClient.hasProject({ projectName: project })) {
-          await langchainClient.deleteProject({ projectName: project });
-        }
-      }
+    const parent_run = new RunTree(parentRunConfig);
+    await parent_run.postRun();
+    await parent_run.end({ output: "Completed: foo" });
+    await parent_run.patchRun();
 
-      const parentRunConfig: RunTreeConfig = {
-        name: "parent_run",
-        inputs: { text: "hello world" },
-        project_name: projectNames[0],
-        client: langchainClient,
-      };
+    const parentRunConfig2: RunTreeConfig = {
+      name: "parent_run",
+      inputs: { text: "hello world" },
+      project_name: projectNames[1],
+      client: langchainClient,
+      metadata: { test_run: runMeta },
+    };
 
-      const parent_run = new RunTree(parentRunConfig);
-      await parent_run.postRun();
-      await parent_run.end({ output: "Completed: foo" });
-      await parent_run.patchRun();
+    const parent_run2 = new RunTree(parentRunConfig2);
+    await parent_run2.postRun();
+    await parent_run2.end({ output: "Completed: foo" });
+    await parent_run2.patchRun();
 
-      const parentRunConfig2: RunTreeConfig = {
-        name: "parent_run",
-        inputs: { text: "hello world" },
-        project_name: projectNames[1],
-        client: langchainClient,
-      };
+    const filter = `and(eq(metadata_key, "test_run"), eq(metadata_value, "${runMeta}"))`;
+    await pollRunsUntilCount(
+      langchainClient,
+      projectNames[0],
+      1,
+      undefined,
+      filter
+    );
+    await pollRunsUntilCount(
+      langchainClient,
+      projectNames[1],
+      1,
+      undefined,
+      filter
+    );
 
-      const parent_run2 = new RunTree(parentRunConfig2);
-      await parent_run2.postRun();
-      await parent_run2.end({ output: "Completed: foo" });
-      await parent_run2.patchRun();
-      await pollRunsUntilCount(langchainClient, projectNames[0], 1);
-      await pollRunsUntilCount(langchainClient, projectNames[1], 1);
+    const runsIter = langchainClient.listRuns({
+      projectName: projectNames,
+      filter,
+    });
+    const runs = await toArray(runsIter);
 
-      const runsIter = langchainClient.listRuns({
-        projectName: projectNames,
-      });
-      const runs = await toArray(runsIter);
-
-      expect(runs.length).toBe(2);
-      expect(
-        runs.every((run) => run?.outputs?.["output"] === "Completed: foo")
-      ).toBe(true);
-      expect(runs[0].session_id).not.toBe(runs[1].session_id);
-    } finally {
-      const langchainClient = new Client();
-
-      for (const project of projectNames) {
-        if (await langchainClient.hasProject({ projectName: project })) {
-          try {
-            await langchainClient.deleteProject({ projectName: project });
-          } catch (e) {
-            // Pass
-          }
-        }
-      }
-    }
+    expect(runs.length).toBe(2);
+    expect(
+      runs.every((run) => run?.outputs?.["output"] === "Completed: foo")
+    ).toBe(true);
+    expect(runs[0].session_id).not.toBe(runs[1].session_id);
   },
   120_000
 );
