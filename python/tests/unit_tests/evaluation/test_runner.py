@@ -9,7 +9,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from threading import Lock
-from typing import Callable, List
+from typing import Callable, List, Literal, Union
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -118,8 +118,8 @@ def _wait_until(condition: Callable, timeout: int = 8):
 
 
 @pytest.mark.skipif(sys.version_info < (3, 9), reason="requires python3.9 or higher")
-@pytest.mark.parametrize("blocking", [False, True])
-def test_evaluate_results(blocking: bool) -> None:
+@pytest.mark.parametrize("blocking", [False, True, "background", "block", "lazy"])
+def test_evaluate_results(blocking: Union[bool, Literal["yield"]]) -> None:
     session = mock.Mock()
     ds_name = "my-dataset"
     ds_id = "00886375-eb2a-4038-9032-efff60309896"
@@ -189,27 +189,36 @@ def test_evaluate_results(blocking: bool) -> None:
         data=dev_split,
         evaluators=[score_value_first],
         num_repetitions=NUM_REPETITIONS,
-        blocking=blocking,
+        # Ignore to check backwards compat when it was a bool
+        blocking=blocking,  # type: ignore[arg-type]
     )
-    if not blocking:
+    N_PREDS = SPLIT_SIZE * NUM_REPETITIONS
+
+    if blocking in (False, "lazy", "background"):
+        if blocking == "lazy":
+            assert len(results._results) == 0
         deltas = []
         last = None
         start = time.time()
         now = start
+        _allresults = []
         for _ in results:
             now = time.time()
             deltas.append((now - last) if last is not None else 0)  # type: ignore
             last = now
+            _allresults.append(_)
+        assert len(deltas) == N_PREDS
         assert now - start > 1.5
-        # Essentially we want to check that 1 delay is > 1.5s and the rest are < 0.1s
-        assert len(deltas) == SPLIT_SIZE * NUM_REPETITIONS
         assert slow_index is not None
 
+        # Essentially we want to check that 1 delay is > 1.5s and the rest are < 0.1s
         total_quick = sum([d < 0.5 for d in deltas])
         total_slow = sum([d > 0.5 for d in deltas])
         tolerance = 3
         assert total_slow < tolerance
-        assert total_quick > (SPLIT_SIZE * NUM_REPETITIONS - 1) - tolerance
+        assert total_quick > (N_PREDS - 1) - tolerance
+    else:
+        assert len(results._results) == N_PREDS
 
     for r in results:
         assert r["run"].outputs["output"] == r["example"].inputs["in"] + 1  # type: ignore
@@ -217,7 +226,7 @@ def test_evaluate_results(blocking: bool) -> None:
 
     assert fake_request.created_session
     _wait_until(lambda: fake_request.runs)
-    N_PREDS = SPLIT_SIZE * NUM_REPETITIONS
+
     _wait_until(lambda: len(ordering_of_stuff) == N_PREDS * 2)
     _wait_until(lambda: slow_index is not None)
     # Want it to be interleaved
