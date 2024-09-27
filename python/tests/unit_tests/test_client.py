@@ -21,7 +21,7 @@ from unittest.mock import MagicMock, patch
 
 import attr
 import dataclasses_json
-import orjson
+import msgspec
 import pytest
 import requests
 from pydantic import BaseModel
@@ -791,7 +791,7 @@ def test_serialize_json() -> None:
         "cyclic2": cycle_2,
         "fake_json": ClassWithFakeJson(),
     }
-    res = orjson.loads(_dumps_json(to_serialize))
+    res = msgspec.json.decode(_dumps_json(to_serialize))
     expected = {
         "uid": str(uid),
         "time": current_time.isoformat(),
@@ -1033,7 +1033,9 @@ def test_batch_ingest_run_splits_large_batches(payload_size: int):
         op
         for call in mock_session.request.call_args_list
         for reqs in (
-            orjson.loads(call[1]["data"]).values() if call[0][0] == "POST" else []
+            msgspec.json.decode(call[1]["data"]).values()
+            if call[0][0] == "POST"
+            else []
         )
         for op in reqs
     ]

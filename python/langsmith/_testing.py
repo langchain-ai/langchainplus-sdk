@@ -12,7 +12,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Callable, Optional, Sequence, Tuple, TypeVar, overload
 
-import orjson
+import msgspec
 from typing_extensions import TypedDict
 
 from langsmith import client as ls_client
@@ -375,7 +375,7 @@ def _serde_example_values(values: VT) -> VT:
         return values
     # Don't try to magically serialize Python objects, just use their REPRs.
     bts = ls_client._dumps_json(values, serialize_py=False)
-    return orjson.loads(bts)
+    return msgspec.json.decode(bts)
 
 
 class _LangSmithTestSuite:
