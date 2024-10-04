@@ -867,7 +867,11 @@ def _evaluate(
         runs,
         client,
     )
-
+    executor = ls_utils.ContextThreadPoolExecutor(
+        # If 0, we will run the system in the main thread but still
+        # submit the feedback in a background thread
+        max_workers=max_concurrency if max_concurrency != 0 else 1
+    )
     manager = _ExperimentManager(
         data,
         client=client,
@@ -877,6 +881,7 @@ def _evaluate(
         num_repetitions=num_repetitions,
         # If provided, we don't need to create a new experiment.
         runs=runs,
+        executor=executor,
         # Create or resolve the experiment.
     ).start()
     cache_dir = ls_utils.get_cache_dir(None)
@@ -1122,6 +1127,8 @@ class _ExperimentManager(_ExperimentManagerMixin):
         summary_results: Optional[Iterable[EvaluationResults]] = None,
         description: Optional[str] = None,
         num_repetitions: int = 1,
+        *,
+        executor: cf.Executor,
     ):
         super().__init__(
             experiment=experiment,
@@ -1135,6 +1142,7 @@ class _ExperimentManager(_ExperimentManagerMixin):
         self._evaluation_results = evaluation_results
         self._summary_results = summary_results
         self._num_repetitions = num_repetitions
+        self._executor = executor
 
     @property
     def examples(self) -> Iterable[schemas.Example]:
@@ -1185,6 +1193,7 @@ class _ExperimentManager(_ExperimentManagerMixin):
             client=self.client,
             runs=self._runs,
             evaluation_results=self._evaluation_results,
+            executor=self._executor,
         )
 
     def with_predictions(
@@ -1206,6 +1215,7 @@ class _ExperimentManager(_ExperimentManagerMixin):
             client=self.client,
             runs=(pred["run"] for pred in r2),
             # TODO: Can't do multiple prediction rounds rn.
+            executor=self._executor,
         )
 
     def with_evaluators(
@@ -1236,6 +1246,7 @@ class _ExperimentManager(_ExperimentManagerMixin):
             runs=(result["run"] for result in r2),
             evaluation_results=(result["evaluation_results"] for result in r3),
             summary_results=self._summary_results,
+            executor=self._executor,
         )
 
     def with_summary_evaluators(
@@ -1256,6 +1267,7 @@ class _ExperimentManager(_ExperimentManagerMixin):
             runs=self.runs,
             evaluation_results=self._evaluation_results,
             summary_results=aggregate_feedback_gen,
+            executor=self._executor,
         )
 
     def get_results(self) -> Iterable[ExperimentResultRow]:
@@ -1296,20 +1308,19 @@ class _ExperimentManager(_ExperimentManagerMixin):
                 )
 
         else:
-            with ls_utils.ContextThreadPoolExecutor(max_concurrency) as executor:
-                futures = [
-                    executor.submit(
-                        _forward,
-                        fn,
-                        example,
-                        self.experiment_name,
-                        self._metadata,
-                        self.client,
-                    )
-                    for example in self.examples
-                ]
-                for future in cf.as_completed(futures):
-                    yield future.result()
+            futures = [
+                self._executor.submit(
+                    _forward,
+                    fn,
+                    example,
+                    self.experiment_name,
+                    self._metadata,
+                    self.client,
+                )
+                for example in self.examples
+            ]
+            for future in cf.as_completed(futures):
+                yield future.result()
         # Close out the project.
         self._end()
 
@@ -1317,7 +1328,6 @@ class _ExperimentManager(_ExperimentManagerMixin):
         self,
         evaluators: Sequence[RunEvaluator],
         current_results: ExperimentResultRow,
-        executor: cf.ThreadPoolExecutor,
     ) -> ExperimentResultRow:
         current_context = rh.get_tracing_context()
         metadata = {
@@ -1349,7 +1359,7 @@ class _ExperimentManager(_ExperimentManagerMixin):
                     eval_results["results"].extend(
                         # TODO: This is a hack
                         self.client._log_evaluation_feedback(
-                            evaluator_response, run=run, _executor=executor
+                            evaluator_response, run=run, _executor=self._executor
                         )
                     )
                 except Exception as e:
@@ -1374,40 +1384,36 @@ class _ExperimentManager(_ExperimentManagerMixin):
         Expects runs to be available in the manager.
         (e.g. from a previous prediction step)
         """
-        with ls_utils.ContextThreadPoolExecutor(
-            max_workers=max_concurrency
-        ) as executor:
-            if max_concurrency == 0:
-                context = copy_context()
-                for current_results in self.get_results():
-                    yield context.run(
+        if max_concurrency == 0:
+            context = copy_context()
+            for current_results in self.get_results():
+                yield context.run(
+                    self._run_evaluators,
+                    evaluators,
+                    current_results,
+                    executor=self._executor,
+                )
+        else:
+            futures = set()
+            for current_results in self.get_results():
+                futures.add(
+                    self._executor.submit(
                         self._run_evaluators,
                         evaluators,
                         current_results,
-                        executor=executor,
                     )
-            else:
-                futures = set()
-                for current_results in self.get_results():
-                    futures.add(
-                        executor.submit(
-                            self._run_evaluators,
-                            evaluators,
-                            current_results,
-                            executor=executor,
-                        )
-                    )
-                    try:
-                        # Since prediction may be slow, yield (with a timeout) to
-                        # allow for early results to be emitted.
-                        for future in cf.as_completed(futures, timeout=0.001):
-                            yield future.result()
-                            futures.remove(future)
-                    except (cf.TimeoutError, TimeoutError):
-                        pass
-                for future in cf.as_completed(futures):
-                    result = future.result()
-                    yield result
+                )
+                try:
+                    # Since prediction may be slow, yield (with a timeout) to
+                    # allow for early results to be emitted.
+                    for future in cf.as_completed(futures, timeout=0.001):
+                        yield future.result()
+                        futures.remove(future)
+                except (cf.TimeoutError, TimeoutError):
+                    pass
+            for future in cf.as_completed(futures):
+                result = future.result()
+                yield result
 
     def _apply_summary_evaluators(
         self, summary_evaluators: Sequence[SUMMARY_EVALUATOR_T]
@@ -1417,48 +1423,47 @@ class _ExperimentManager(_ExperimentManagerMixin):
             runs.append(run)
             examples.append(example)
         aggregate_feedback = []
-        with ls_utils.ContextThreadPoolExecutor() as executor:
-            project_id = self._get_experiment().id
-            current_context = rh.get_tracing_context()
-            metadata = {
-                **(current_context["metadata"] or {}),
-                **{
-                    "experiment": self.experiment_name,
-                    "experiment_id": project_id,
-                },
+        project_id = self._get_experiment().id
+        current_context = rh.get_tracing_context()
+        metadata = {
+            **(current_context["metadata"] or {}),
+            **{
+                "experiment": self.experiment_name,
+                "experiment_id": project_id,
+            },
+        }
+        with rh.tracing_context(
+            **{
+                **current_context,
+                "project_name": "evaluators",
+                "metadata": metadata,
+                "client": self.client,
+                "enabled": True,
             }
-            with rh.tracing_context(
-                **{
-                    **current_context,
-                    "project_name": "evaluators",
-                    "metadata": metadata,
-                    "client": self.client,
-                    "enabled": True,
-                }
-            ):
-                for evaluator in summary_evaluators:
-                    try:
-                        summary_eval_result = evaluator(runs, examples)
-                        # TODO: Expose public API for this.
-                        flattened_results = self.client._select_eval_results(
-                            summary_eval_result,
-                            fn_name=evaluator.__name__,
+        ):
+            for evaluator in summary_evaluators:
+                try:
+                    summary_eval_result = evaluator(runs, examples)
+                    # TODO: Expose public API for this.
+                    flattened_results = self.client._select_eval_results(
+                        summary_eval_result,
+                        fn_name=evaluator.__name__,
+                    )
+                    aggregate_feedback.extend(flattened_results)
+                    for result in flattened_results:
+                        feedback = result.dict(exclude={"target_run_id"})
+                        evaluator_info = feedback.pop("evaluator_info", None)
+                        self._executor.submit(
+                            self.client.create_feedback,
+                            **feedback,
+                            run_id=None,
+                            project_id=project_id,
+                            source_info=evaluator_info,
                         )
-                        aggregate_feedback.extend(flattened_results)
-                        for result in flattened_results:
-                            feedback = result.dict(exclude={"target_run_id"})
-                            evaluator_info = feedback.pop("evaluator_info", None)
-                            executor.submit(
-                                self.client.create_feedback,
-                                **feedback,
-                                run_id=None,
-                                project_id=project_id,
-                                source_info=evaluator_info,
-                            )
-                    except Exception as e:
-                        logger.error(
-                            f"Error running summary evaluator {repr(evaluator)}: {e}"
-                        )
+                except Exception as e:
+                    logger.error(
+                        f"Error running summary evaluator {repr(evaluator)}: {e}"
+                    )
         yield {"results": aggregate_feedback}
 
     def _get_dataset_version(self) -> Optional[str]:
@@ -1499,6 +1504,7 @@ class _ExperimentManager(_ExperimentManagerMixin):
             end_time=datetime.datetime.now(datetime.timezone.utc),
             metadata=project_metadata,
         )
+        self._executor.shutdown()
 
 
 def _resolve_evaluators(

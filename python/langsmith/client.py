@@ -4207,7 +4207,7 @@ class Client:
         source_info: Optional[Dict[str, Any]] = None,
         project_id: Optional[ID_TYPE] = None,
         *,
-        _executor: Optional[cf.ThreadPoolExecutor] = None,
+        _executor: Optional[cf.Executor] = None,
     ) -> List[ls_evaluator.EvaluationResult]:
         results = self._select_eval_results(evaluator_response)
 
