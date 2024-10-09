@@ -1,0 +1,111 @@
+[**langsmith**](../../README.md) • **Docs**
+
+***
+
+[langsmith](../../README.md) / [schemas](../README.md) / ExampleCreate
+
+# Interface: ExampleCreate
+
+## Extends
+
+- [`BaseExample`](BaseExample.md)
+
+## Properties
+
+### created\_at?
+
+> `optional` **created\_at**: `string`
+
+#### Defined in
+
+[src/schemas.ts:232](https://github.com/langchain-ai/langsmith-sdk/blob/da3c1bb4f1396b48909bf0abac53fd717458c764/js/src/schemas.ts#L232)
+
+***
+
+### dataset\_id
+
+> **dataset\_id**: `string`
+
+#### Inherited from
+
+[`BaseExample`](BaseExample.md).[`dataset_id`](BaseExample.md#dataset_id)
+
+#### Defined in
+
+[src/schemas.ts:59](https://github.com/langchain-ai/langsmith-sdk/blob/da3c1bb4f1396b48909bf0abac53fd717458c764/js/src/schemas.ts#L59)
+
+***
+
+### id?
+
+> `optional` **id**: `string`
+
+#### Defined in
+
+[src/schemas.ts:231](https://github.com/langchain-ai/langsmith-sdk/blob/da3c1bb4f1396b48909bf0abac53fd717458c764/js/src/schemas.ts#L231)
+
+***
+
+### inputs
+
+> **inputs**: [`KVMap`](../type-aliases/KVMap.md)
+
+#### Inherited from
+
+[`BaseExample`](BaseExample.md).[`inputs`](BaseExample.md#inputs)
+
+#### Defined in
+
+[src/schemas.ts:60](https://github.com/langchain-ai/langsmith-sdk/blob/da3c1bb4f1396b48909bf0abac53fd717458c764/js/src/schemas.ts#L60)
+
+***
+
+### metadata?
+
+> `optional` **metadata**: [`KVMap`](../type-aliases/KVMap.md)
+
+#### Inherited from
+
+[`BaseExample`](BaseExample.md).[`metadata`](BaseExample.md#metadata)
+
+#### Defined in
+
+[src/schemas.ts:62](https://github.com/langchain-ai/langsmith-sdk/blob/da3c1bb4f1396b48909bf0abac53fd717458c764/js/src/schemas.ts#L62)
+
+***
+
+### outputs?
+
+> `optional` **outputs**: [`KVMap`](../type-aliases/KVMap.md)
+
+#### Inherited from
+
+[`BaseExample`](BaseExample.md).[`outputs`](BaseExample.md#outputs)
+
+#### Defined in
+
+[src/schemas.ts:61](https://github.com/langchain-ai/langsmith-sdk/blob/da3c1bb4f1396b48909bf0abac53fd717458c764/js/src/schemas.ts#L61)
+
+***
+
+### source\_run\_id?
+
+> `optional` **source\_run\_id**: `string`
+
+#### Inherited from
+
+[`BaseExample`](BaseExample.md).[`source_run_id`](BaseExample.md#source_run_id)
+
+#### Defined in
+
+[src/schemas.ts:63](https://github.com/langchain-ai/langsmith-sdk/blob/da3c1bb4f1396b48909bf0abac53fd717458c764/js/src/schemas.ts#L63)
+
+***
+
+### split?
+
+> `optional` **split**: `string` \| `string`[]
+
+#### Defined in
+
+[src/schemas.ts:233](https://github.com/langchain-ai/langsmith-sdk/blob/da3c1bb4f1396b48909bf0abac53fd717458c764/js/src/schemas.ts#L233)

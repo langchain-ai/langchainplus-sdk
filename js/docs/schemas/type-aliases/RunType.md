@@ -1,0 +1,13 @@
+[**langsmith**](../../README.md) • **Docs**
+
+***
+
+[langsmith](../../README.md) / [schemas](../README.md) / RunType
+
+# Type Alias: RunType
+
+> **RunType**: `"llm"` \| `"chain"` \| `"tool"` \| `"retriever"` \| `"embedding"` \| `"prompt"` \| `"parser"`
+
+## Defined in
+
+[src/schemas.ts:46](https://github.com/langchain-ai/langsmith-sdk/blob/da3c1bb4f1396b48909bf0abac53fd717458c764/js/src/schemas.ts#L46)

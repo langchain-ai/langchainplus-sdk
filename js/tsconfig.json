@@ -44,6 +44,14 @@
       "src/wrappers/openai.ts",
       "src/wrappers/vercel.ts",
       "src/singletons/traceable.ts"
-    ]
+    ],
+    "readme": "none",
+    "out": "docs",
+    "plugin": [
+      "typedoc-plugin-markdown"
+    ],
+    "excludePrivate": true,
+    "excludeProtected": true,
+    "excludeExternals": false
   }
 }

@@ -102,6 +102,8 @@
     "p-queue": "^6.6.2",
     "p-retry": "4",
     "semver": "^7.6.3",
+    "typedoc": "^0.26.8",
+    "typedoc-plugin-markdown": "^4.2.9",
     "uuid": "^10.0.0"
   },
   "devDependencies": {
