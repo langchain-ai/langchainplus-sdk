@@ -26,11 +26,6 @@ benchmarks = (
         10_000,
     ),
     (
-        "create_20_000_run_trees",
-        create_run_trees,
-        10_000,
-    ),
-    (
         "dumps_class_nested_py_branch_and_leaf_200x400",
         lambda x: _dumps_json({"input": x}),
         create_nested_instance(

@@ -268,12 +268,6 @@ def _serialize_json(obj: Any) -> Any:
         return str(obj)
 
 
-def _elide_surrogates(s: bytes) -> bytes:
-    pattern = re.compile(rb"\\ud[89a-f][0-9a-f]{2}", re.IGNORECASE)
-    result = pattern.sub(b"", s)
-    return result
-
-
 def _dumps_json_single(
     obj: Any, default: Optional[Callable[[Any], Any]] = None
 ) -> bytes:
@@ -289,18 +283,11 @@ def _dumps_json_single(
     except TypeError as e:
         # Usually caused by UTF surrogate characters
         logger.debug(f"Orjson serialization failed: {repr(e)}. Falling back to json.")
-        result = json.dumps(
+        return json.dumps(
             obj,
             default=_simple_default,
             ensure_ascii=True,
-        ).encode("utf-8")
-        try:
-            result = orjson.dumps(
-                orjson.loads(result.decode("utf-8", errors="surrogateescape"))
-            )
-        except orjson.JSONDecodeError:
-            result = _elide_surrogates(result)
-        return result
+        ).encode("utf-8", "ignore")
 
 
 def _dumps_json(obj: Any, depth: int = 0) -> bytes:
