@@ -60,14 +60,14 @@ _METADATA = contextvars.ContextVar[Optional[Dict[str, Any]]]("_METADATA", defaul
 _TRACING_ENABLED = contextvars.ContextVar[Optional[bool]](
     "_TRACING_ENABLED", default=None
 )
-_CLIENT = contextvars.ContextVar[Optional[ls_client.Client]]("_CLIENT", default=None)
+
 _CONTEXT_KEYS: Dict[str, contextvars.ContextVar] = {
     "parent": _PARENT_RUN_TREE,
     "project_name": _PROJECT_NAME,
     "tags": _TAGS,
     "metadata": _METADATA,
     "enabled": _TRACING_ENABLED,
-    "client": _CLIENT,
+    "client": run_trees._CONTEXT_CLIENT,
 }
 
 
@@ -87,7 +87,7 @@ def get_tracing_context(
             "tags": _TAGS.get(),
             "metadata": _METADATA.get(),
             "enabled": _TRACING_ENABLED.get(),
-            "client": _CLIENT.get(),
+            "client": run_trees._CONTEXT_CLIENT.get(),
         }
     return {k: context.get(v) for k, v in _CONTEXT_KEYS.items()}
 
@@ -935,7 +935,7 @@ class trace:
             _METADATA.set(metadata)
             _PARENT_RUN_TREE.set(self.new_run)
             _PROJECT_NAME.set(project_name_)
-            _CLIENT.set(client_)
+            run_trees._CONTEXT_CLIENT.set(client_)
 
         return self.new_run
 
@@ -1304,7 +1304,7 @@ def _setup_run(
     outer_project = _PROJECT_NAME.get()
     langsmith_extra = langsmith_extra or LangSmithExtra()
     name = langsmith_extra.get("name") or container_input.get("name")
-    client_ = langsmith_extra.get("client", client) or _CLIENT.get()
+    client_ = langsmith_extra.get("client", client) or run_trees._CONTEXT_CLIENT.get()
     parent_run_ = _get_parent_run(
         {**langsmith_extra, "client": client_}, kwargs.get("config")
     )

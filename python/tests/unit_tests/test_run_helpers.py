@@ -26,7 +26,7 @@ from langsmith.run_helpers import (
     traceable,
     tracing_context,
 )
-from langsmith.run_trees import RunTree
+from langsmith.run_trees import RunTree, get_cached_client
 
 
 def _get_calls(
@@ -1683,3 +1683,12 @@ def test_traceable_stop_iteration():
 
     wrapped = traceable(my_generator)
     assert list(consume(wrapped)) == list(range(5))
+
+
+def test_context_client():
+    c = Client(session=MagicMock())
+    original = get_cached_client()
+    with tracing_context(client=c):
+        assert get_cached_client() == c
+        assert RunTree().client == c
+    assert get_cached_client() == original

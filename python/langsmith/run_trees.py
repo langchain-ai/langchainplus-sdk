@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextvars
 import json
 import logging
 import sys
@@ -33,6 +34,7 @@ LANGSMITH_METADATA = sys.intern(f"{LANGSMITH_PREFIX}metadata")
 LANGSMITH_TAGS = sys.intern(f"{LANGSMITH_PREFIX}tags")
 LANGSMITH_PROJECT = sys.intern(f"{LANGSMITH_PREFIX}project")
 _CLIENT: Optional[Client] = None
+_CONTEXT_CLIENT = contextvars.ContextVar[Optional[Client]]("_CLIENT", default=None)
 _LOCK = threading.Lock()  # Keeping around for a while for backwards compat
 
 
@@ -40,6 +42,8 @@ _LOCK = threading.Lock()  # Keeping around for a while for backwards compat
 
 
 def get_cached_client(**init_kwargs: Any) -> Client:
+    if _CONTEXT_CLIENT:
+        return _CONTEXT_CLIENT
     global _CLIENT
     if _CLIENT is None:
         if _CLIENT is None:
