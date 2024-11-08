@@ -887,7 +887,7 @@ class Prompt(BaseModel):
     """The number of downloads."""
     num_views: int
     """The number of views."""
-    liked_by_auth_user: bool
+    liked_by_auth_user: bool = False
     """Whether the prompt is liked by the authenticated user."""
     last_commit_hash: Optional[str] = None
     """The hash of the last commit."""
@@ -897,6 +897,8 @@ class Prompt(BaseModel):
     """The full name of the original prompt, if forked."""
     upstream_repo_full_name: Optional[str] = None
     """The full name of the upstream prompt, if forked."""
+    latest_commit_manifest: Optional[dict] = None
+    """The latest commit manifest response."""
 
 
 class ListPromptsResponse(BaseModel):

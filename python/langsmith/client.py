@@ -5186,43 +5186,67 @@ class Client:
     def list_prompts(
         self,
         *,
-        limit: int = 100,
+        with_latest_manifest: bool = False,
+        limit: int = 20,
         offset: int = 0,
-        is_public: Optional[bool] = None,
-        is_archived: Optional[bool] = False,
-        sort_field: ls_schemas.PromptSortField = ls_schemas.PromptSortField.updated_at,
-        sort_direction: Literal["desc", "asc"] = "desc",
+        tenant_handle: Optional[str] = None,
+        tenant_id: Optional[str] = None,
         query: Optional[str] = None,
+        has_commits: Optional[bool] = None,
+        tags: Optional[list[str]] = None,
+        is_archived: Optional[str] = None,
+        is_public: Optional[str] = None,
+        upstream_repo_owner: Optional[str] = None,
+        upstream_repo_handle: Optional[str] = None,
+        match_prefix: bool = False,
+        tag_value_id: Optional[list[str]] = None,
+        sort_field: Optional[str] = None,
+        sort_direction: Optional[Literal["asc", "desc"]] = None,
     ) -> ls_schemas.ListPromptsResponse:
         """List prompts with pagination.
 
         Args:
-            limit (int): The maximum number of prompts to return. Defaults to 100.
+            with_latest_manifest (bool): Include latest manifest. Defaults to False.
+            limit (int): The maximum number of prompts to return. Defaults to 20.
             offset (int): The number of prompts to skip. Defaults to 0.
-            is_public (Optional[bool]): Filter prompts by if they are public.
-            is_archived (Optional[bool]): Filter prompts by if they are archived.
-            sort_field (ls_schemas.PromptsSortField): The field to sort by.
-              Defaults to "updated_at".
-            sort_direction (Literal["desc", "asc"]): The order to sort by.
-              Defaults to "desc".
+            tenant_handle (Optional[str]): Filter by tenant handle.
+            tenant_id (Optional[str]): Filter by tenant ID.
             query (Optional[str]): Filter prompts by a search query.
+            has_commits (Optional[bool]): Filter prompts by whether they have commits.
+            tags (Optional[list[str]]): Filter prompts by tags.
+            is_archived (Optional[str]): Filter prompts by archived status.
+            is_public (Optional[str]): Filter prompts by public status.
+            upstream_repo_owner (Optional[str]): Filter by upstream repo owner.
+            upstream_repo_handle (Optional[str]): Filter by upstream repo handle.
+            match_prefix (bool): Whether to match prefix in query. Defaults to False.
+            tag_value_id (Optional[list[str]]): Filter by tag value IDs.
+            sort_field (Optional[str]): The field to sort by.
+            sort_direction (Optional[Literal["asc", "desc"]]): The order to sort by.
 
         Returns:
             ls_schemas.ListPromptsResponse: A response object containing
             the list of prompts.
         """
         params = {
+            "with_latest_manifest": str(with_latest_manifest).lower(),
             "limit": limit,
             "offset": offset,
-            "is_public": (
-                "true" if is_public else "false" if is_public is not None else None
-            ),
-            "is_archived": "true" if is_archived else "false",
+            "tenant_handle": tenant_handle,
+            "tenant_id": tenant_id,
+            "query": query,
+            "has_commits": has_commits,
+            "tags": tags,
+            "is_archived": is_archived,
+            "is_public": is_public,
+            "upstream_repo_owner": upstream_repo_owner,
+            "upstream_repo_handle": upstream_repo_handle,
+            "match_prefix": str(match_prefix).lower(),
+            "tag_value_id": tag_value_id,
             "sort_field": sort_field,
             "sort_direction": sort_direction,
-            "query": query,
-            "match_prefix": "true" if query else None,
         }
+
+        params = {k: v for k, v in params.items() if v is not None}
 
         response = self.request_with_retries("GET", "/repos/", params=params)
         return ls_schemas.ListPromptsResponse(**response.json())
