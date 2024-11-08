@@ -272,7 +272,7 @@ async def aevaluate_existing(
     client: Optional[langsmith.Client] = None,
     load_nested: bool = False,
     blocking: bool = True,
-) -> AsyncIterator[ExperimentResultRow]:
+) -> AsyncExperimentResults:
     r"""Evaluate existing experiment runs asynchronously.
 
     Args:
@@ -833,43 +833,32 @@ class AsyncExperimentResults:
     ):
         self._manager = experiment_manager
         self._results: List[ExperimentResultRow] = []
-        self._lock = asyncio.Lock()
-        self._task = asyncio.create_task(self._process_data(self._manager))
-        self._processed_count = 0
+        self._task = asyncio.create_task(self._process_data())
+        self._processing_complete = asyncio.Event()
 
     @property
     def experiment_name(self) -> str:
         return self._manager.experiment_name
 
     def __aiter__(self) -> AsyncIterator[ExperimentResultRow]:
-        return self
+        return self._aiter()
 
-    async def __anext__(self) -> ExperimentResultRow:
-        async def _wait_until_index(index: int) -> None:
-            while self._processed_count < index:
-                await asyncio.sleep(0.05)
-
+    async def _aiter(self) -> AsyncIterator[ExperimentResultRow]:
+        index = 0
         while True:
-            async with self._lock:
-                if self._processed_count < len(self._results):
-                    result = self._results[self._processed_count]
-                    self._processed_count += 1
-                    return result
-                elif self._task.done():
-                    raise StopAsyncIteration
+            if index < len(self._results):
+                yield self._results[index]
+                index += 1
+            elif self._processing_complete.is_set():
+                break
+            await asyncio.sleep(0.01)
 
-            await asyncio.shield(
-                asyncio.wait_for(_wait_until_index(len(self._results)), timeout=None)
-            )
-
-    async def _process_data(self, manager: _AsyncExperimentManager) -> None:
+    async def _process_data(self) -> None:
         tqdm = _load_tqdm()
-        async for item in tqdm(manager.aget_results()):
-            async with self._lock:
-                self._results.append(item)
-        summary_scores = await manager.aget_summary_scores()
-        async with self._lock:
-            self._summary_results = summary_scores
+        async for item in tqdm(self._manager.aget_results()):
+            self._results.append(item)
+        self._summary_results = await self._manager.aget_summary_scores()
+        self._processing_complete.set()
 
     def to_pandas(
         self, start: Optional[int] = 0, end: Optional[int] = None

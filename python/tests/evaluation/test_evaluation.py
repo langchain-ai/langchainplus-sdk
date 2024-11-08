@@ -334,6 +334,8 @@ async def test_aevaluate():
         assert len(df) == 20
     examples = client.list_examples(dataset_name=dataset_name, as_of="test_version")
     all_results = [r async for r in results]
+    all_results_again = [r async for r in results]
+    assert all_results == all_results_again
     all_examples = []
     for example in examples:
         count = 0

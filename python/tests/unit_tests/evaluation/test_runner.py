@@ -211,10 +211,15 @@ def test_evaluate_results(blocking: bool) -> None:
         tolerance = 3
         assert total_slow < tolerance
         assert total_quick > (SPLIT_SIZE * NUM_REPETITIONS - 1) - tolerance
-
+    all_results = []
     for r in results:
         assert r["run"].outputs["output"] == r["example"].inputs["in"] + 1  # type: ignore
         assert set(r["run"].outputs.keys()) == {"output"}  # type: ignore
+        all_results.append(r)
+        if len(all_results) == 2:
+            # Ensure we aren't resetting some stateful thing on the results obj
+            [r for r in results]
+    assert len(all_results)
 
     assert fake_request.created_session
     _wait_until(lambda: fake_request.runs)
@@ -379,10 +384,15 @@ async def test_aevaluate_results(blocking: bool) -> None:
         assert total_slow < tolerance
         assert total_quick > (SPLIT_SIZE * NUM_REPETITIONS - 1) - tolerance
         assert any([d > 1 for d in deltas])
-
+    _all_results = []
     async for r in results:
         assert r["run"].outputs["output"] == r["example"].inputs["in"] + 1  # type: ignore
         assert set(r["run"].outputs.keys()) == {"output"}  # type: ignore
+        _all_results.append(r)
+        if len(_all_results) == 1:
+            # Ensure we aren't resetting some stateful thing on the results obj
+            [r async for r in results]
+    assert len(_all_results) == SPLIT_SIZE * NUM_REPETITIONS
 
     assert fake_request.created_session
     _wait_until(lambda: fake_request.runs)
