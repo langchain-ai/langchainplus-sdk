@@ -2721,6 +2721,13 @@ class Client:
         inputs_schema: Optional[Dict[str, Any]] = None,
         outputs_schema: Optional[Dict[str, Any]] = None,
         metadata: Optional[dict] = None,
+        inputs: Optional[Sequence[Mapping[str, Any]]] = None,
+        outputs: Optional[Sequence[Optional[Mapping[str, Any]]]] = None,
+        examples_metadata: Optional[Sequence[Optional[Mapping[str, Any]]]] = None,
+        splits: Optional[Sequence[Optional[str | List[str]]]] = None,
+        source_run_ids: Optional[Sequence[Optional[ID_TYPE]]] = None,
+        ids: Optional[Sequence[Optional[ID_TYPE]]] = None,
+        **kwargs: Any,
     ) -> ls_schemas.Dataset:
         """Create a dataset in the LangSmith API.
 
@@ -2734,40 +2741,67 @@ class Client:
             The data type of the dataset.
         metadata: dict or None, default=None
             Additional metadata to associate with the dataset.
+        inputs : Sequence[Mapping[str, Any]] or None, default=None
+            The input values for the examples.
+        outputs : Optional[Sequence[Optional[Mapping[str, Any]]]], default=None
+            The output values for the examples.
+        examples_metadata : Optional[Sequence[Optional[Mapping[str, Any]]]], default=None
+            The metadata for the examples.
+        splits :  Optional[Sequence[Optional[str | List[str]]]], default=None
+            The splits for the examples, which are divisions
+            of your dataset such as 'train', 'test', or 'validation'.
+            source_run_ids : Optional[Sequence[Optional[ID_TYPE]]], default=None
+            The IDs of the source runs associated with the examples.
+        ids : Optional[Sequence[ID_TYPE]], default=None
+            The IDs of the examples.
 
         Returns:
         -------
         Dataset
             The created dataset.
         """
-        dataset: Dict[str, Any] = {
+        data: Dict[str, Any] = {
             "name": dataset_name,
             "data_type": data_type.value,
             "created_at": datetime.datetime.now().isoformat(),
             "extra": {"metadata": metadata} if metadata else None,
         }
         if description is not None:
-            dataset["description"] = description
+            data["description"] = description
 
         if inputs_schema is not None:
-            dataset["inputs_schema_definition"] = inputs_schema
+            data["inputs_schema_definition"] = inputs_schema
 
         if outputs_schema is not None:
-            dataset["outputs_schema_definition"] = outputs_schema
+            data["outputs_schema_definition"] = outputs_schema
 
         response = self.request_with_retries(
             "POST",
             "/datasets",
             headers={**self._headers, "Content-Type": "application/json"},
-            data=orjson.dumps(dataset),
+            data=orjson.dumps(data),
         )
         ls_utils.raise_for_status_with_text(response)
 
-        return ls_schemas.Dataset(
+        dataset = ls_schemas.Dataset(
             **response.json(),
             _host_url=self._host_url,
             _tenant_id=self._get_optional_tenant_id(),
         )
+
+        if inputs:
+            self.create_examples(
+                inputs=inputs,
+                outputs=outputs,
+                metadata=examples_metadata,
+                splits=splits,
+                source_run_ids=source_run_ids,
+                ids=ids,
+                dataset_id=dataset.id,
+                **kwargs,
+            )
+
+        return dataset
 
     def has_dataset(
         self, *, dataset_name: Optional[str] = None, dataset_id: Optional[str] = None
