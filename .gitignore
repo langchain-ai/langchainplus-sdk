@@ -161,3 +161,14 @@ cython_debug/
 .DS_Store
 
 .envrc
+
+# SQLite database files
+*.sqlite3
+*.sqlite
+*.db
+
+# memory profiler results
+*.mprof
+mprofile_*.dat
+
+runs.lmdb/
