@@ -2600,29 +2600,43 @@ class Client:
     def get_test_results(
         self,
         *,
-        project_id: Optional[ID_TYPE] = None,
-        project_name: Optional[str] = None,
-    ) -> pd.DataFrame:
-        """Read the record-level information from an experiment into a Pandas DF.
+        experiment_name: Optional[str] = None,
+        experiment_id: Optional[ID_TYPE] = None,
+        response_format: Literal["pandas", "list"] = "pandas",
+        **kwargs: Any,
+    ) -> Union[pd.DataFrame, List[Dict[str, Any]]]:
+        """Read the record-level information from an experiment.
 
         Note: this will fetch whatever data exists in the DB. Results are not
         immediately available in the DB upon evaluation run completion.
 
         Returns:
         --------
-        pd.DataFrame
-            A dataframe containing the test results.
+        Union[pd.DataFrame, List[Dict[str, Any]]]
+            A dataframe or list of dictionaries containing the test results.
         """
+        if kwargs.get("project_id"):
+            warnings.warn(
+                f'Argument "project_id" is deprecated. Use experiment_id instead (client.get_test_results(experiment_id="{project_id}"))',
+                DeprecationWarning,
+            )
+            experiment_id = kwargs.pop("project_id")
+        elif kwargs.get("project_name"):
+            warnings.warn(
+                f'Argument "project_name" is deprecated. Use experiment_name instead (client.get_test_results(experiment_name="{project_name}"))',
+                DeprecationWarning,
+            )
+            experiment_name = kwargs.pop("project_name")
+        else:
+            raise ValueError("Must provide project_name or project_id")
         warnings.warn(
             "Function get_test_results is in beta.", UserWarning, stacklevel=2
         )
         from concurrent.futures import ThreadPoolExecutor, as_completed  # type: ignore
 
-        import pandas as pd  # type: ignore
-
         runs = self.list_runs(
-            project_id=project_id,
-            project_name=project_name,
+            project_id=experiment_id,
+            project_name=experiment_name,
             is_root=True,
             select=[
                 "id",
@@ -2635,7 +2649,7 @@ class Client:
                 "end_time",
             ],
         )
-        results: list[dict] = []
+        results: List[Dict[str, Any]] = []
         example_ids = []
 
         def fetch_examples(batch):
@@ -2643,20 +2657,21 @@ class Client:
             return [
                 {
                     "example_id": example.id,
-                    **{f"reference.{k}": v for k, v in (example.outputs or {}).items()},
+                    "inputs": example.inputs,
+                    "reference_outputs": example.outputs or {},
                 }
                 for example in examples
             ]
 
         batch_size = 50
         cursor = 0
+
         with ThreadPoolExecutor() as executor:
             futures = []
             for r in runs:
                 row = {
                     "example_id": r.reference_example_id,
-                    **{f"input.{k}": v for k, v in r.inputs.items()},
-                    **{f"outputs.{k}": v for k, v in (r.outputs or {}).items()},
+                    "outputs": r.outputs or {},
                     "execution_time": (
                         (r.end_time - r.start_time).total_seconds()
                         if r.end_time
@@ -2677,25 +2692,48 @@ class Client:
                 else:
                     logger.warning(f"Run {r.id} has no reference example ID.")
                 if len(example_ids) % batch_size == 0:
-                    # Ensure not empty
                     if batch := example_ids[cursor : cursor + batch_size]:
                         futures.append(executor.submit(fetch_examples, batch))
                         cursor += batch_size
                 results.append(row)
 
-            # Handle any remaining examples
             if example_ids[cursor:]:
                 futures.append(executor.submit(fetch_examples, example_ids[cursor:]))
-        result_df = pd.DataFrame(results).set_index("example_id")
+
         example_outputs = [
             output for future in as_completed(futures) for output in future.result()
         ]
-        if example_outputs:
-            example_df = pd.DataFrame(example_outputs).set_index("example_id")
-            result_df = example_df.merge(result_df, left_index=True, right_index=True)
 
-        # Flatten dict columns into dot syntax for easier access
-        return pd.json_normalize(result_df.to_dict(orient="records"))
+        if example_outputs:
+            example_dict = {item["example_id"]: item for item in example_outputs}
+            for result in results:
+                if result["example_id"] in example_dict:
+                    result.update(example_dict[result["example_id"]])
+
+        if response_format == "list":
+            return results
+        elif response_format == "pandas":
+            try:
+                import pandas as pd
+            except ImportError:
+                raise ImportError(
+                    "The 'pandas' library is required to use the 'pandas' response_format. "
+                    "Please install it using 'pip install pandas'."
+                )
+            # Flatten the inputs/outputs/reference_outputs fields
+            for result in results:
+                inputs = result.pop("inputs", {})
+                outputs = result.pop("outputs", {})
+                reference_outputs = result.pop("reference_outputs", {})
+                for k, v in inputs.items():
+                    result[f"inputs.{k}"] = v
+                for k, v in outputs.items():
+                    result[f"outputs.{k}"] = v
+                for k, v in reference_outputs.items():
+                    result[f"reference.{k}"] = v
+            return pd.json_normalize(pd.DataFrame(results).to_dict(orient="records"))
+        else:
+            raise ValueError("Invalid response_format. Must be 'list' or 'pandas'.")
 
     def list_projects(
         self,
