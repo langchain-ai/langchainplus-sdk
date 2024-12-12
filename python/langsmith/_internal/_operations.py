@@ -141,6 +141,27 @@ def serialize_run_dict(
         attachments=attachments if attachments is not None else None,
     )
 
+def serialize_run_dict_for_compressed_ingest(
+    operation: Literal["post", "patch"], payload: dict
+):
+    inputs = payload.pop("inputs", None)
+    outputs = payload.pop("outputs", None)
+    events = payload.pop("events", None)
+    attachments = payload.pop("attachments", None)
+    serialized = ...
+    extra = ...
+    return SerializedRunOperation(
+        operation=operation,
+        id=payload["id"],
+        trace_id=payload["trace_id"],
+        _none=_dumps_json(payload),
+        inputs=_dumps_json(inputs) if inputs is not None else None,
+        outputs=_dumps_json(outputs) if outputs is not None else None,
+        events=_dumps_json(events) if events is not None else None,
+        attachments=attachments if attachments is not None else None,
+    )
+
+
 
 def combine_serialized_queue_operations(
     ops: list[Union[SerializedRunOperation, SerializedFeedbackOperation]],
