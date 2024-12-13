@@ -1,0 +1,26 @@
+[package]
+name = "langsmith-nodejs"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+# "cdylib" is necessary to produce a shared library for Node.js to import from.
+# "rlib" is what Rust uses to use this crate as a library, for example in tests, benchmarks,
+#    examples, or Rust binaries built using this library.
+#
+# Downstream *Rust* code (including any code in `bin/`, `examples/`, and `tests/`) will not be able
+# to `use langsmith_nodejs;` unless the "rlib" or "lib" crate type is also included.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+napi = { workspace = true }
+napi-derive = { workspace = true }
+langsmith-tracing-client = { path = "../langsmith-tracing-client" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[build-dependencies]
+napi-build = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,53 @@
+{
+  "name": "langsmith-nodejs",
+  "package": "langsmith-nodejs",
+  "version": "0.1.0",
+  "author": "LangChain",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "artifacts": "napi artifacts",
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "prepublishOnly": "napi prepublish -t npm",
+    "test": "jest",
+    "version": "napi version"
+  },
+  "dependencies": {
+    "@node-rs/helper": "^1.2.1"
+  },
+  "devDependencies": {
+    "@jest/globals": "^29.5.0",
+    "@napi-rs/cli": "^2.0.0",
+    "@tsconfig/recommended": "^1.0.8",
+    "@types/jest": "^29.5.14",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.7.2"
+  },
+  "napi": {
+    "name": "langsmith-nodejs",
+    "triples": {
+      "defaults": false,
+      "additional": [
+        "aarch64-apple-darwin",
+        "x86_64-pc-windows-msvc",
+        "x86_64-unknown-linux-gnu",
+        "x86_64-unknown-linux-musl"
+      ]
+    }
+  },
+  "bugs": {
+    "url": "https://github.com/langchain-ai/langsmith-sdk/issues"
+  },
+  "homepage": "https://github.com/langchain-ai/langsmith-sdk#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/langchain-ai/langsmith-sdk.git"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">= 18"
+  },
+  "packageManager": "yarn@1.22.22"
+}

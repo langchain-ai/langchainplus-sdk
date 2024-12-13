@@ -103,6 +103,7 @@
   "dependencies": {
     "@types/uuid": "^10.0.0",
     "commander": "^10.0.1",
+    "langsmith-nodejs": "file:../rust/crates/langsmith-nodejs",
     "p-queue": "^6.6.2",
     "p-retry": "4",
     "semver": "^7.6.3",

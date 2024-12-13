@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 // Map attachment ref to tuple of filename, optional bytes
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Attachment {
     pub ref_name: String,
     pub filename: String,
@@ -18,7 +18,7 @@ pub enum TimeValue {
     UnsignedInt(u64),
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Serialize, Deserialize)]
 pub struct RunIO {
     pub inputs: Option<Vec<u8>>,
     pub outputs: Option<Vec<u8>>,
@@ -99,7 +99,7 @@ pub struct RunUpdate {
     pub end_time: TimeValue,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RunCreateExtended {
     pub run_create: RunCreate,
     pub io: RunIO,

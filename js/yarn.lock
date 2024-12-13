@@ -1442,6 +1442,18 @@
   dependencies:
     js-tiktoken "^1.0.12"
 
+"@napi-rs/triples@^1.2.0":
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/@napi-rs/triples/-/triples-1.2.0.tgz#bcd9c936acb93890e7015818e0181f3db421aafa"
+  integrity sha512-HAPjR3bnCsdXBsATpDIP5WCrw0JcACwhhrwIAQhiR46n+jm+a2F8kBsfseAuWtSyQ+H3Yebt2k43B5dy+04yMA==
+
+"@node-rs/helper@^1.2.1":
+  version "1.6.0"
+  resolved "https://registry.yarnpkg.com/@node-rs/helper/-/helper-1.6.0.tgz#83e5381de6e898d0b8c92178bb8d897d619e3a3a"
+  integrity sha512-2OTh/tokcLA1qom1zuCJm2gQzaZljCCbtX1YCrwRVd/toz7KxaDRFeLTAPwhs8m9hWgzrBn5rShRm6IaZofCPw==
+  dependencies:
+    "@napi-rs/triples" "^1.2.0"
+
 "@nodelib/fs.scandir@2.1.5":
   version "2.1.5"
   resolved "https://registry.npmjs.org/@nodelib/fs.scandir/-/fs.scandir-2.1.5.tgz"
@@ -3783,6 +3795,11 @@ langchain@^0.3.3:
     yaml "^2.2.1"
     zod "^3.22.4"
     zod-to-json-schema "^3.22.3"
+
+"langsmith-nodejs@file:../rust/crates/langsmith-nodejs":
+  version "0.1.0"
+  dependencies:
+    "@node-rs/helper" "^1.2.1"
 
 langsmith@^0.1.56, langsmith@^0.1.65:
   version "0.1.67"

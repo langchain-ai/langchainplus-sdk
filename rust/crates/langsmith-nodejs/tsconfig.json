@@ -1,0 +1,33 @@
+{
+  "extends": "@tsconfig/recommended",
+  "compilerOptions": {
+    "target": "ES2021",
+    "lib": [
+      "ES2021",
+      "ES2022.Object"
+    ],
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
+    "esModuleInterop": true,
+    "declaration": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "useDefineForClassFields": true,
+    "strictPropertyInitialization": false,
+    "stripInternal": true,
+    "allowJs": true,
+    "strict": true,
+    "outDir": "dist"
+  },
+  "include": [
+    "index.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage"
+  ],
+  "includeVersion": true
+}

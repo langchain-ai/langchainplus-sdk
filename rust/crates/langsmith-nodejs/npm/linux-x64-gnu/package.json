@@ -1,0 +1,21 @@
+{
+  "name": "langsmith-nodejs-linux-x64-gnu",
+  "version": "0.0.0",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "main": "langsmith-nodejs.linux-x64-gnu.node",
+  "files": [
+    "langsmith-nodejs.linux-x64-gnu.node"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">= 18"
+  },
+  "libc": [
+    "glibc"
+  ]
+}
