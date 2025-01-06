@@ -5659,6 +5659,13 @@ class Client:
         name: str,
         description: Optional[str] = None,
         queue_id: Optional[ID_TYPE] = None,
+        default_dataset_id: Optional[ID_TYPE] = None,
+        default_dataset_name: Optional[str] = None,
+        num_reviewers_per_item: Optional[int] = None,
+        enable_reservations: Optional[bool] = True,
+        reservation_minutes: Optional[int] = None,
+        rubric_items: Optional[Sequence[Mapping[str, Any]]] = None,
+        rubric_instructions: Optional[str] = None,
     ) -> ls_schemas.AnnotationQueue:
         """Create an annotation queue on the LangSmith API.
 
@@ -5669,14 +5676,39 @@ class Client:
                 The description of the annotation queue.
             queue_id (Optional[Union[UUID, str]]):
                 The ID of the annotation queue.
+            default_dataset : str, optional
+                The default dataset for the queue.
+            num_reviewers_per_item : int, optional
+                Number of reviewers per item.
+            enable_reservations : bool, optional
+                Whether to enable reservations. Defaults to True.
+            reservation_minutes : int, optional
+                Number of minutes for reservations.
+            rubric_items : List[Dict[str, Any]], optional
+                List of rubric items for the queue.
+            rubric_instructions : str, optional
+                Instructions for the rubric.
 
         Returns:
             AnnotationQueue: The created annotation queue object.
         """
+        if default_dataset_id is not None:
+            default_dataset = _as_uuid(default_dataset_id, "default_dataset_id")
+        elif default_dataset_name is not None:
+            default_dataset = self.read_dataset(dataset_name=default_dataset_name).id
+        else:
+            default_dataset = None
+
         body = {
             "name": name,
             "description": description,
             "id": queue_id or str(uuid.uuid4()),
+            "default_dataset": default_dataset,
+            "num_reviewers_per_item": num_reviewers_per_item,
+            "enable_reservations": enable_reservations,
+            "reservation_minutes": reservation_minutes,
+            "rubric_items": rubric_items,
+            "rubric_instructions": rubric_instructions,
         }
         response = self.request_with_retries(
             "POST",

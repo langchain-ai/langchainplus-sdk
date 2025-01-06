@@ -3499,18 +3499,60 @@ export class Client implements LangSmithTracingClientInterface {
    * @param options.name - The name of the annotation queue
    * @param options.description - The description of the annotation queue
    * @param options.queueId - The ID of the annotation queue
+   * @param options.defaultDatasetId - The ID of the default dataset for the queue
+   * @param options.defaultDatasetName - The name of the default dataset for the queue
+   * @param options.numReviewersPerItem - Number of reviewers per item
+   * @param options.enableReservations - Whether to enable reservations
+   * @param options.reservationMinutes - Number of minutes for reservations
+   * @param options.rubricItems - List of rubric items for the queue
+   * @param options.rubricInstructions - Instructions for the rubric
    * @returns The created AnnotationQueue object
    */
   public async createAnnotationQueue(options: {
     name: string;
     description?: string;
     queueId?: string;
+    defaultDatasetId?: string;
+    defaultDatasetName?: string;
+    numReviewersPerItem?: number;
+    enableReservations?: boolean;
+    reservationMinutes?: number;
+    rubricItems?: Array<Record<string, any>>;
+    rubricInstructions?: string;
   }): Promise<AnnotationQueue> {
-    const { name, description, queueId } = options;
+    const {
+      name,
+      description,
+      queueId,
+      defaultDatasetId,
+      defaultDatasetName,
+      numReviewersPerItem,
+      enableReservations = true,
+      reservationMinutes,
+      rubricItems,
+      rubricInstructions,
+    } = options;
+
+    let defaultDataset: string | undefined;
+    if (defaultDatasetId) {
+      defaultDataset = assertUuid(defaultDatasetId, "defaultDatasetId");
+    } else if (defaultDatasetName) {
+      const dataset = await this.readDataset({
+        datasetName: defaultDatasetName,
+      });
+      defaultDataset = dataset.id;
+    }
+
     const body = {
       name,
       description,
       id: queueId || uuid.v4(),
+      default_dataset: defaultDataset,
+      num_reviewers_per_item: numReviewersPerItem,
+      enable_reservations: enableReservations,
+      reservation_minutes: reservationMinutes,
+      rubric_items: rubricItems,
+      rubric_instructions: rubricInstructions,
     };
 
     const response = await this.caller.call(
