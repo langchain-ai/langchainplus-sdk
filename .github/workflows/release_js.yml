@@ -27,7 +27,7 @@ jobs:
         with:
           node-version: 20.x
           cache: "yarn"
-          cache-dependency-path: "js/yarn.lock"
+          cache-dependency-path: "yarn.lock"
       - name: Install dependencies
         run: yarn install --immutable
       - name: Build

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["**/.env"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["js/src/**", "js-api-refs/scripts/**", "js-api-refs/typedoc_plugins/*"],
+      "outputs": ["js/dist/**", "js-api-refs/public/**"]
+    },
+    "lint": {
+      "dependsOn": ["^lint"],
+      "inputs": ["js/src/**"]
+    },
+    "format": {
+      "dependsOn": ["^format"],
+      "inputs": ["js/src/**"]
+    }
+  }
+}

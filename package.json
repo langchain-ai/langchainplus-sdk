@@ -1,0 +1,20 @@
+{
+  "name": "langsmith-sdk",
+  "private": true,
+  "version": "0.0.0",
+  "author": "Brace Sproul",
+  "license": "MIT",
+  "packageManager": "yarn@1.22.19",
+  "workspaces": [
+    "js-api-refs",
+    "js"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "format": "turbo run format"
+  },
+  "devDependencies": {
+    "turbo": "latest"
+  }
+}

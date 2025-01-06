@@ -21,7 +21,7 @@ runs:
       with:
         node-version: ${{ inputs.node-version }}
         cache: "yarn"
-        cache-dependency-path: "js/yarn.lock"
+        cache-dependency-path: "yarn.lock"
 
     - name: Install Yarn dependencies
       run: yarn install

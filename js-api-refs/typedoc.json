@@ -1,0 +1,29 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "out": "public",
+  "sort": [
+    "kind",
+    "visibility",
+    "instance-first",
+    "required-first",
+    "alphabetical"
+  ],
+  "plugin": [
+    "./typedoc_plugins/hide_underscore_lc.js",
+    "typedoc-plugin-expand-object-like-types"
+  ],
+  "tsconfig": "../js/tsconfig.json",
+  "readme": "none",
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "excludeExternals": true,
+  "excludeNotDocumented": false,
+  "includeVersion": true,
+  "sourceLinkTemplate": "https://github.com/langchain-ai/langsmith-sdk/blob/{gitRevision}/{path}#L{line}",
+  "logLevel": "Error",
+  "name": "LangSmith SDK (JS/TS)",
+  "skipErrorChecking": true,
+  "exclude": [
+    "dist"
+  ]
+}

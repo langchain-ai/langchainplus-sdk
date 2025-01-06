@@ -16,6 +16,7 @@ on:
       run_integration_tests:
         description: "Run integration tests"
         default: "false"
+        type: choice
         options: ["true", "false"]
 
 jobs:
@@ -32,7 +33,7 @@ jobs:
         with:
           node-version: 18.x
           cache: "yarn"
-          cache-dependency-path: "js/yarn.lock"
+          cache-dependency-path: "yarn.lock"
       - name: Install dependencies
         run: yarn install --immutable --mode=skip-build
       - name: Check formatting
@@ -51,7 +52,7 @@ jobs:
         with:
           node-version: 18.x
           cache: "yarn"
-          cache-dependency-path: "js/yarn.lock"
+          cache-dependency-path: "yarn.lock"
       - name: Install dependencies
         run: yarn install --immutable --mode=skip-build
       - name: Check linting
@@ -70,7 +71,7 @@ jobs:
         with:
           node-version: 18.x
           cache: "yarn"
-          cache-dependency-path: "js/yarn.lock"
+          cache-dependency-path: "yarn.lock"
       - name: Install dependencies
         run: yarn install --immutable
       - name: Build and check types
@@ -99,7 +100,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: "yarn"
-          cache-dependency-path: "js/yarn.lock"
+          cache-dependency-path: "yarn.lock"
       - name: Install dependencies
         run: yarn install --immutable
       - name: Build
