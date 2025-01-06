@@ -299,60 +299,66 @@ class RunTree(ls_schemas.RunBase):
 
     def post(self, exclude_child_runs: bool = True) -> None:
         """Post the run tree to the API asynchronously."""
-        kwargs = self._get_dicts_safe()
-        self.client.create_run(**kwargs)
-        if attachments := kwargs.get("attachments"):
-            keys = [str(name) for name in attachments]
-            self.events.append(
-                {
-                    "name": "uploaded_attachment",
-                    "time": datetime.now(timezone.utc).isoformat(),
-                    "message": set(keys),
-                }
-            )
-        if not exclude_child_runs:
-            for child_run in self.child_runs:
-                child_run.post(exclude_child_runs=False)
+        try:
+            kwargs = self._get_dicts_safe()
+            self.client.create_run(**kwargs)
+            if attachments := kwargs.get("attachments"):
+                keys = [str(name) for name in attachments]
+                self.events.append(
+                    {
+                        "name": "uploaded_attachment",
+                        "time": datetime.now(timezone.utc).isoformat(),
+                        "message": set(keys),
+                    }
+                )
+            if not exclude_child_runs:
+                for child_run in self.child_runs:
+                    child_run.post(exclude_child_runs=False)
+        except Exception as e:
+            logger.warning(f"Error creating run: {e}")
 
     def patch(self) -> None:
         """Patch the run tree to the API in a background thread."""
-        if not self.end_time:
-            self.end()
-        attachments = self.attachments
         try:
-            # Avoid loading the same attachment twice
-            if attachments:
-                uploaded = next(
-                    (
-                        ev
-                        for ev in self.events
-                        if ev.get("name") == "uploaded_attachment"
-                    ),
-                    None,
-                )
-                if uploaded:
-                    attachments = {
-                        a: v
-                        for a, v in attachments.items()
-                        if a not in uploaded["message"]
-                    }
+            if not self.end_time:
+                self.end()
+            attachments = self.attachments
+            try:
+                # Avoid loading the same attachment twice
+                if attachments:
+                    uploaded = next(
+                        (
+                            ev
+                            for ev in self.events
+                            if ev.get("name") == "uploaded_attachment"
+                        ),
+                        None,
+                    )
+                    if uploaded:
+                        attachments = {
+                            a: v
+                            for a, v in attachments.items()
+                            if a not in uploaded["message"]
+                        }
+            except Exception as e:
+                logger.warning(f"Error filtering attachments to upload: {e}")
+            self.client.update_run(
+                name=self.name,
+                run_id=self.id,
+                outputs=self.outputs.copy() if self.outputs else None,
+                error=self.error,
+                parent_run_id=self.parent_run_id,
+                reference_example_id=self.reference_example_id,
+                end_time=self.end_time,
+                dotted_order=self.dotted_order,
+                trace_id=self.trace_id,
+                events=self.events,
+                tags=self.tags,
+                extra=self.extra,
+                attachments=attachments,
+            )
         except Exception as e:
-            logger.warning(f"Error filtering attachments to upload: {e}")
-        self.client.update_run(
-            name=self.name,
-            run_id=self.id,
-            outputs=self.outputs.copy() if self.outputs else None,
-            error=self.error,
-            parent_run_id=self.parent_run_id,
-            reference_example_id=self.reference_example_id,
-            end_time=self.end_time,
-            dotted_order=self.dotted_order,
-            trace_id=self.trace_id,
-            events=self.events,
-            tags=self.tags,
-            extra=self.extra,
-            attachments=attachments,
-        )
+            logger.warning(f"Error updating run: {e}")
 
     def wait(self) -> None:
         """Wait for all _futures to complete."""

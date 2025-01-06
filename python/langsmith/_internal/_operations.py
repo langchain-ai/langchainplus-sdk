@@ -124,6 +124,26 @@ def serialize_feedback_dict(
     )
 
 
+def _dumps_json_safe(value: object, which: str) -> bytes:
+    try:
+        return _dumps_json(value)
+    except Exception as e:
+        logger.warning(f"Error serializing {which}: {e}")
+        try:
+            return _dumps_json(
+                {
+                    "langsmith_serialization_error": f"Error serializing {which}:"
+                    f" {str(e)}\n\n{value}"
+                }
+            )
+        except Exception:
+            return _dumps_json(
+                {
+                    "langsmith_serialization_error": f"Error serializing {which}: {str(e)}"
+                }
+            )
+
+
 def serialize_run_dict(
     operation: Literal["post", "patch"], payload: dict
 ) -> SerializedRunOperation:
@@ -136,9 +156,9 @@ def serialize_run_dict(
         id=payload["id"],
         trace_id=payload["trace_id"],
         _none=_dumps_json(payload),
-        inputs=_dumps_json(inputs) if inputs is not None else None,
-        outputs=_dumps_json(outputs) if outputs is not None else None,
-        events=_dumps_json(events) if events is not None else None,
+        inputs=_dumps_json_safe(inputs, "inputs") if inputs is not None else None,
+        outputs=_dumps_json_safe(outputs, "outputs") if outputs is not None else None,
+        events=_dumps_json_safe(events, "events") if events is not None else None,
         attachments=attachments if attachments is not None else None,
     )
 
