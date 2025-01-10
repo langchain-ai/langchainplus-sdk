@@ -276,3 +276,170 @@ async def test_list_feedback(async_client: AsyncClient):
         return len(feedbacks) == 3
 
     await wait_for(check_feedbacks, timeout=10)
+
+    feedbacks = [
+        feedback async for feedback in async_client.list_feedback(run_ids=[run_id])
+    ]
+    assert len(feedbacks) == 3
+
+
+@pytest.mark.asyncio
+async def test_delete_feedback(async_client: AsyncClient):
+    """Test deleting feedback."""
+    project_name = "__test_delete_feedback" + uuid.uuid4().hex[:8]
+    run_id = uuid.uuid4()
+
+    await async_client.create_run(
+        name="test_run",
+        inputs={"input": "hello"},
+        run_type="llm",
+        project_name=project_name,
+        id=run_id,
+        start_time=datetime.datetime.now(datetime.timezone.utc),
+    )
+
+    # Create feedback
+    feedback = await async_client.create_feedback(
+        run_id=run_id,
+        key="test_feedback",
+        value=1,
+        comment="test comment",
+    )
+
+    # Delete the feedback
+    await async_client.delete_feedback(feedback.id)
+
+    # Verify feedback is deleted by checking list_feedback
+    feedbacks = [
+        feedback async for feedback in async_client.list_feedback(run_ids=[run_id])
+    ]
+    assert len(feedbacks) == 0
+
+
+@pytest.mark.asyncio
+async def test_annotation_queue_crud(async_client: AsyncClient):
+    """Test basic CRUD operations for annotation queues."""
+    queue_name = f"test_queue_{uuid.uuid4().hex[:8]}"
+    queue_id = uuid.uuid4()
+
+    # Test creation
+    queue = await async_client.create_annotation_queue(
+        name=queue_name, description="Test queue", queue_id=queue_id
+    )
+    assert queue.name == queue_name
+    assert queue.id == queue_id
+
+    # Test reading
+    read_queue = await async_client.read_annotation_queue(queue_id)
+    assert read_queue.id == queue_id
+    assert read_queue.name == queue_name
+
+    # Test updating
+    new_name = f"updated_{queue_name}"
+    await async_client.update_annotation_queue(
+        queue_id=queue_id, name=new_name, description="Updated description"
+    )
+
+    updated_queue = await async_client.read_annotation_queue(queue_id)
+    assert updated_queue.name == new_name
+
+    # Test deletion
+    await async_client.delete_annotation_queue(queue_id)
+
+    # Verify deletion
+    queues = [
+        queue
+        async for queue in async_client.list_annotation_queues(queue_ids=[queue_id])
+    ]
+    assert len(queues) == 0
+
+
+@pytest.mark.asyncio
+async def test_list_annotation_queues(async_client: AsyncClient):
+    """Test listing and filtering annotation queues."""
+    queue_names = [f"test_queue_{i}_{uuid.uuid4().hex[:8]}" for i in range(3)]
+    queue_ids = []
+
+    try:
+        # Create test queues
+        for name in queue_names:
+            queue = await async_client.create_annotation_queue(
+                name=name, description="Test queue"
+            )
+            queue_ids.append(queue.id)
+
+        # Test listing with various filters
+        queues = [
+            queue
+            async for queue in async_client.list_annotation_queues(
+                queue_ids=queue_ids[:2], limit=2
+            )
+        ]
+        assert len(queues) == 2
+
+        # Test name filter
+        queues = [
+            queue
+            async for queue in async_client.list_annotation_queues(name=queue_names[0])
+        ]
+        assert len(queues) == 1
+        assert queues[0].name == queue_names[0]
+
+        # Test name_contains filter
+        queues = [
+            queue
+            async for queue in async_client.list_annotation_queues(
+                name_contains="test_queue"
+            )
+        ]
+        assert len(queues) >= 3  # Could be more if other tests left queues
+
+    finally:
+        # Clean up
+        for queue_id in queue_ids:
+            await async_client.delete_annotation_queue(queue_id)
+
+
+@pytest.mark.asyncio
+async def test_annotation_queue_runs(async_client: AsyncClient):
+    """Test managing runs within an annotation queue."""
+    queue_name = f"test_queue_{uuid.uuid4().hex[:8]}"
+    project_name = f"test_project_{uuid.uuid4().hex[:8]}"
+
+    # Create a queue
+    queue = await async_client.create_annotation_queue(
+        name=queue_name, description="Test queue"
+    )
+
+    # Create some test runs
+    run_ids = [uuid.uuid4() for _ in range(3)]
+    for i in range(3):
+        await async_client.create_run(
+            name=f"test_run_{i}",
+            inputs={"input": f"test_{i}"},
+            run_type="llm",
+            project_name=project_name,
+            start_time=datetime.datetime.now(datetime.timezone.utc),
+            id=run_ids[i],
+        )
+
+    # Add runs to queue
+    await async_client.add_runs_to_annotation_queue(queue_id=queue.id, run_ids=run_ids)
+
+    # Test getting run at index
+    run_info = await async_client.get_run_from_annotation_queue(
+        queue_id=queue.id, index=0
+    )
+    assert run_info.id in run_ids
+
+    # Test deleting a run from queue
+    await async_client.delete_run_from_annotation_queue(
+        queue_id=queue.id, run_id=run_ids[2]
+    )
+
+    # Test that runs are deleted
+    run = await async_client.get_run_from_annotation_queue(queue_id=queue.id, index=0)
+    assert run.id == run_ids[1]
+
+    # Clean up
+    await async_client.delete_annotation_queue(queue.id)

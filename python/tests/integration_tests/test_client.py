@@ -2015,3 +2015,129 @@ def test_update_examples_multipart(langchain_client: Client) -> None:
 
     # Clean up
     langchain_client.delete_dataset(dataset_id=dataset.id)
+
+
+def test_annotation_queue_crud(langchain_client: Client):
+    """Test basic CRUD operations for annotation queues."""
+    queue_name = f"test_queue_{uuid.uuid4().hex[:8]}"
+    queue_id = uuid.uuid4()
+
+    # Test creation
+    queue = langchain_client.create_annotation_queue(
+        name=queue_name, description="Test queue", queue_id=queue_id
+    )
+    assert queue.name == queue_name
+    assert queue.id == queue_id
+
+    # Test reading
+    read_queue = langchain_client.read_annotation_queue(queue_id)
+    assert read_queue.id == queue_id
+    assert read_queue.name == queue_name
+
+    # Test updating
+    new_name = f"updated_{queue_name}"
+    langchain_client.update_annotation_queue(
+        queue_id=queue_id, name=new_name, description="Updated description"
+    )
+
+    updated_queue = langchain_client.read_annotation_queue(queue_id)
+    assert updated_queue.name == new_name
+
+    # Test deletion
+    langchain_client.delete_annotation_queue(queue_id)
+
+    # Verify deletion
+    queues = list(langchain_client.list_annotation_queues(queue_ids=[queue_id]))
+    assert len(queues) == 0
+
+
+def test_list_annotation_queues(langchain_client: Client):
+    """Test listing and filtering annotation queues."""
+    queue_names = [f"test_queue_{i}_{uuid.uuid4().hex[:8]}" for i in range(3)]
+    queue_ids = []
+
+    try:
+        # Create test queues
+        for name in queue_names:
+            queue = langchain_client.create_annotation_queue(
+                name=name, description="Test queue"
+            )
+            queue_ids.append(queue.id)
+
+        # Test listing with various filters
+        queues = list(
+            langchain_client.list_annotation_queues(queue_ids=queue_ids[:2], limit=2)
+        )
+        assert len(queues) == 2
+
+        # Test name filter
+        queues = list(langchain_client.list_annotation_queues(name=queue_names[0]))
+        assert len(queues) == 1
+        assert queues[0].name == queue_names[0]
+
+        # Test name_contains filter
+        queues = list(
+            langchain_client.list_annotation_queues(name_contains="test_queue")
+        )
+        assert len(queues) >= 3  # Could be more if other tests left queues
+
+    finally:
+        # Clean up
+        for queue_id in queue_ids:
+            langchain_client.delete_annotation_queue(queue_id)
+
+
+def test_annotation_queue_runs(langchain_client: Client):
+    """Test managing runs within an annotation queue."""
+    queue_name = f"test_queue_{uuid.uuid4().hex[:8]}"
+    project_name = f"test_project_{uuid.uuid4().hex[:8]}"
+
+    # Create a queue
+    queue = langchain_client.create_annotation_queue(
+        name=queue_name, description="Test queue"
+    )
+
+    # Create some test runs
+    run_ids = [uuid.uuid4() for _ in range(3)]
+    for i in range(3):
+        langchain_client.create_run(
+            name=f"test_run_{i}",
+            inputs={"input": f"test_{i}"},
+            run_type="llm",
+            project_name=project_name,
+            start_time=datetime.datetime.now(datetime.timezone.utc),
+            id=run_ids[i],
+        )
+
+    def _get_run(run_id: ID_TYPE, has_end: bool = False) -> bool:
+        try:
+            r = langchain_client.read_run(run_id)  # type: ignore
+            if has_end:
+                return r.end_time is not None
+            return True
+        except LangSmithError:
+            return False
+
+    wait_for(lambda: _get_run(run_ids[0]))
+    wait_for(lambda: _get_run(run_ids[1]))
+    wait_for(lambda: _get_run(run_ids[2]))
+    # Add runs to queue
+    langchain_client.add_runs_to_annotation_queue(queue_id=queue.id, run_ids=run_ids)
+
+    # Test getting run at index
+    run_info = langchain_client.get_run_from_annotation_queue(
+        queue_id=queue.id, index=0
+    )
+    assert run_info.id in run_ids
+
+    # Test deleting a run from queue
+    langchain_client.delete_run_from_annotation_queue(
+        queue_id=queue.id, run_id=run_ids[2]
+    )
+
+    # Test that runs are deleted
+    run = langchain_client.get_run_from_annotation_queue(queue_id=queue.id, index=0)
+    assert run.id == run_ids[1]
+
+    # Clean up
+    langchain_client.delete_annotation_queue(queue.id)

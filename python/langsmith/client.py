@@ -5699,7 +5699,7 @@ class Client:
         body = {
             "name": name,
             "description": description,
-            "id": queue_id or str(uuid.uuid4()),
+            "id": str(queue_id) if queue_id is not None else str(uuid.uuid4()),
         }
         response = self.request_with_retries(
             "POST",
