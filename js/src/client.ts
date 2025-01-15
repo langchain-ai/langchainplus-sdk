@@ -53,7 +53,11 @@ import {
   getLangSmithEnvironmentVariable,
   getRuntimeEnvironment,
 } from "./utils/env.js";
-
+import {
+  convertToMultipartBlobChunks,
+  serializeRunOperationAsMultipart,
+  type MultipartPart,
+} from "./utils/multipart.js";
 import {
   EvaluationResult,
   EvaluationResults,
@@ -87,6 +91,10 @@ export interface ClientConfig {
    * Useful if encountering network rate limits at trace high volumes.
    */
   manualFlushMode?: boolean;
+  /**
+   * Whether to enable compression of batched runs before sending to LangSmith.
+   */
+  useRunCompression?: boolean;
 }
 
 /**
@@ -284,15 +292,19 @@ export type CreateExampleOptions = {
   sourceRunId?: string;
 };
 
-type AutoBatchQueueItem = {
+type AutoBatchQueueItemInput = {
   action: "create" | "update";
   item: RunCreate | RunUpdate;
 };
 
-type MultipartPart = {
-  name: string;
-  payload: Blob;
+type AutoBatchQueueItem = {
+  action: "create" | "update";
+  item: RunCreate | RunUpdate | Blob;
 };
+
+function isBlob(x: unknown): x is Blob {
+  return x != null && typeof x === "object" && "size" in x;
+}
 
 export function mergeRuntimeEnvIntoRunCreate(run: RunCreate) {
   const runtimeEnv = getRuntimeEnvironment();
@@ -373,10 +385,35 @@ const handle429 = async (response?: Response) => {
   return false;
 };
 
+const _compressPayload = async (stream: CompressionStream, payload: Blob[]) => {
+  const compressedPayloadStream = new Blob(payload)
+    .stream()
+    .pipeThrough(stream);
+  const reader = compressedPayloadStream.getReader();
+  const chunks = [];
+  let totalLength = 0;
+  try {
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      totalLength += value.length;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return new Blob(chunks);
+};
+
+function _createNewCompressionStream() {
+  return new CompressionStream("gzip");
+}
+
 export class AutoBatchQueue {
   items: {
     action: "create" | "update";
-    payload: RunCreate | RunUpdate;
+    payload: RunCreate | RunUpdate | Blob;
     itemPromiseResolve: () => void;
     itemPromise: Promise<void>;
     size: number;
@@ -388,17 +425,20 @@ export class AutoBatchQueue {
     return this.items[0];
   }
 
-  push(item: AutoBatchQueueItem): Promise<void> {
+  async push(item: AutoBatchQueueItemInput): Promise<void> {
     let itemPromiseResolve;
     const itemPromise = new Promise<void>((resolve) => {
       // Setting itemPromiseResolve is synchronous with promise creation:
       // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/Promise
       itemPromiseResolve = resolve;
     });
-    const size = stringifyForTracing(item.item).length;
+    let payload: RunCreate | RunUpdate | Blob = item.item;
+    const size = isBlob(payload)
+      ? payload.size
+      : stringifyForTracing(payload).length;
     this.items.push({
       action: item.action,
-      payload: item.item,
+      payload,
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       itemPromiseResolve: itemPromiseResolve!,
       itemPromise,
@@ -495,6 +535,11 @@ export class Client implements LangSmithTracingClientInterface {
 
   private manualFlushMode = false;
 
+  private useRunCompression =
+    getEnvironmentVariable("LANGSMITH_USE_RUN_COMPRESSION") === "true";
+
+  private compressionStream = _createNewCompressionStream();
+
   constructor(config: ClientConfig = {}) {
     const defaultConfig = Client.getDefaultClientConfig();
 
@@ -533,6 +578,7 @@ export class Client implements LangSmithTracingClientInterface {
     this.batchSizeBytesLimit = config.batchSizeBytesLimit;
     this.fetchOptions = config.fetchOptions || {};
     this.manualFlushMode = config.manualFlushMode ?? this.manualFlushMode;
+    this.useRunCompression = config.useRunCompression ?? this.useRunCompression;
   }
 
   public static getDefaultClientConfig(): {
@@ -821,18 +867,48 @@ export class Client implements LangSmithTracingClientInterface {
     }
   }
 
-  private async processRunOperation(item: AutoBatchQueueItem) {
+  private async processRunOperation(
+    item: AutoBatchQueueItemInput
+  ): Promise<void> {
     clearTimeout(this.autoBatchTimeout);
     this.autoBatchTimeout = undefined;
+    let queueItem: AutoBatchQueueItem = item;
     if (item.action === "create") {
       item.item = mergeRuntimeEnvIntoRunCreate(item.item as RunCreate);
+    }
+    const sizeLimitBytes = await this._getBatchSizeLimitBytes();
+    if (this.useRunCompression) {
+      const { parts } = serializeRunOperationAsMultipart(
+        item.action,
+        item.item
+      );
+      const blobChunks = convertToMultipartBlobChunks(parts);
+      // It would be great if you could get the compressed size from a ReadableStream
+      // so that we could pass the CompressionStream directly into a "fetch" call,
+      // but this doesn't seem like it's possible.
+      const compressedItem = await _compressPayload(
+        this.compressionStream,
+        blobChunks
+      );
+      if (
+        this.autoBatchQueue.sizeBytes + compressedItem.size >
+        sizeLimitBytes
+      ) {
+        this.compressionStream = _createNewCompressionStream();
+        // Drain the entire queue since items compressed with one stream are not compatible with others
+        await this.drainAutoBatchQueue(Number.MAX_SAFE_INTEGER);
+        // Throw out the compressed value and retry
+        // TODO: Instead, should we estimate compressed size so as not to throw away compression work?
+        return this.processRunOperation(item);
+      } else {
+        queueItem.item = compressedItem;
+      }
     }
     const itemPromise = this.autoBatchQueue.push(item);
     if (this.manualFlushMode) {
       // Rely on manual flushing in serverless environments
       return itemPromise;
     }
-    const sizeLimitBytes = await this._getBatchSizeLimitBytes();
     if (this.autoBatchQueue.sizeBytes > sizeLimitBytes) {
       void this.drainAutoBatchQueue(sizeLimitBytes);
     }
