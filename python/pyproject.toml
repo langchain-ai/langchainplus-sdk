@@ -36,7 +36,7 @@ httpx = ">=0.23.0,<1"
 requests-toolbelt = "^1.0.0"
 
 # Enabled via `langsmith_pyo3` extra: `pip install langsmith[langsmith_pyo3]`.
-langsmith-pyo3 = { version = "^0.1.0rc2", optional = true }
+langsmith-pyo3 = { version = "^0.2.0rc1", optional = true }
 # Enabled via `compression` extra: `pip install langsmith[compression]`.
 zstandard = { version = "^0.23.0", optional = true }
 
