@@ -21,6 +21,7 @@ fastrand = { workspace = true }
 crossbeam-channel = { workspace = true }
 http = { workspace = true }
 zstd = { workspace = true }
+backon = { workspace = true }
 
 [dev-dependencies]
 multer = "3.1.0"

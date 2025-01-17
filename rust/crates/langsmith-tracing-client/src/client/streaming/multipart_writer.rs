@@ -1,5 +1,7 @@
 use std::{borrow::Cow, io::Write, path::Path};
 
+use crate::client::errors::StreamState;
+
 pub struct StreamingMultipart<W: Write> {
     writer: W,
     boundary: String,
@@ -46,11 +48,7 @@ impl<W: Write> StreamingMultipart<W> {
         }
     }
 
-    pub(super) fn json_part(
-        &mut self,
-        name: &str,
-        serialized: &[u8],
-    ) -> Result<(), std::io::Error> {
+    pub(super) fn json_part(&mut self, name: &str, serialized: &[u8]) -> Result<(), StreamState> {
         self.empty = false;
         let boundary = self.boundary.as_str();
         let length = serialized.len();
@@ -75,10 +73,11 @@ Content-Disposition: form-data; name=\"{name}\"\r\n\
 Content-Type: application/json\r\n\
 Content-Length: {length}\r\n\
 \r\n"
-        )?;
+        )
+        .map_err(StreamState::polluted)?;
 
-        self.writer.write_all(serialized)?;
-        write!(self.writer, "\r\n")
+        self.writer.write_all(serialized).map_err(StreamState::polluted)?;
+        write!(self.writer, "\r\n").map_err(StreamState::polluted)
     }
 
     pub(super) fn file_part_from_bytes(
@@ -87,7 +86,7 @@ Content-Length: {length}\r\n\
         file_name: &str,
         content_type: &str,
         contents: &[u8],
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), StreamState> {
         self.empty = false;
         let boundary = self.boundary.as_str();
         let length = contents.len();
@@ -106,11 +105,12 @@ Content-Disposition: form-data; name=\"{name}\"; filename=\"{file_name}\"\r\n\
 Content-Type: {content_type}\r\n\
 Content-Length: {length}\r\n\
 \r\n"
-        )?;
+        )
+        .map_err(StreamState::polluted)?;
 
-        self.writer.write_all(contents)?;
+        self.writer.write_all(contents).map_err(StreamState::polluted)?;
 
-        write!(self.writer, "\r\n")
+        write!(self.writer, "\r\n").map_err(StreamState::polluted)
     }
 
     pub(super) fn file_part_from_path(
@@ -119,14 +119,14 @@ Content-Length: {length}\r\n\
         file_name: &str,
         content_type: &str,
         path: &Path,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), StreamState> {
         self.empty = false;
         let boundary = self.boundary.as_str();
         let name = Self::escape_field_value(name);
         let file_name = Self::escape_field_value(file_name);
 
-        let mut file = std::fs::File::open(path)?;
-        let metadata = file.metadata()?;
+        let mut file = std::fs::File::open(path).map_err(StreamState::safe)?;
+        let metadata = file.metadata().map_err(StreamState::safe)?;
         let file_size = metadata.len();
 
         // `Content-Length` is explicitly prohibited in multipart parts by RFC 7578:
@@ -141,11 +141,12 @@ Content-Disposition: form-data; name=\"{name}\"; filename=\"{file_name}\"\r\n\
 Content-Type: {content_type}\r\n\
 Content-Length: {file_size}\r\n\
 \r\n"
-        )?;
+        )
+        .map_err(StreamState::polluted)?;
 
-        std::io::copy(&mut file, &mut self.writer)?;
+        std::io::copy(&mut file, &mut self.writer).map_err(StreamState::polluted)?;
 
-        write!(self.writer, "\r\n")
+        write!(self.writer, "\r\n").map_err(StreamState::polluted)
     }
 
     pub(super) fn finish(mut self) -> Result<W, std::io::Error> {

@@ -24,13 +24,14 @@ pub struct TracingClient {
 impl TracingClient {
     pub fn new(mut config: ClientConfig) -> Result<Self, TracingClientError> {
         let (sender, receiver) = crossbeam_channel::bounded(config.queue_capacity);
-        let (drain_sender, drain_receiver) = crossbeam_channel::bounded(1);
+        let (drain_sender, drain_receiver) = crossbeam_channel::bounded(0);
 
-        // Ensure our headers include the API key.
-        config.headers.get_or_insert_with(Default::default).append(
-            "X-API-KEY",
-            HeaderValue::from_str(&config.api_key).expect("failed to convert API key into header"),
-        );
+        // Ensure our headers include the API key,
+        // and it's marked as "sensitive" so it doesn't get printed in logs.
+        let mut api_key_header =
+            HeaderValue::from_str(&config.api_key).expect("failed to convert API key into header");
+        api_key_header.set_sensitive(true);
+        config.headers.get_or_insert_with(Default::default).append("X-API-KEY", api_key_header);
 
         // We're going to share the config across threads.
         // It's immutable from this point onward, so Arc it for efficiency.
@@ -38,7 +39,7 @@ impl TracingClient {
 
         let worker = thread::spawn(move || {
             let mut processor = super::RunProcessor::new(receiver, drain_sender, config);
-            processor.run().expect("run failed")
+            processor.run();
         });
 
         Ok(Self { sender, drain: drain_receiver, worker })
