@@ -2124,6 +2124,7 @@ export class Client implements LangSmithTracingClientInterface {
     nameContains,
     referenceDatasetId,
     referenceDatasetName,
+    datasetVersion,
     referenceFree,
     metadata,
   }: {
@@ -2132,9 +2133,10 @@ export class Client implements LangSmithTracingClientInterface {
     nameContains?: string;
     referenceDatasetId?: string;
     referenceDatasetName?: string;
+    datasetVersion?: string;
     referenceFree?: boolean;
     metadata?: RecordStringAny;
-  } = {}): AsyncIterable<TracerSession> {
+  } = {}): AsyncIterable<TracerSessionResult> {
     const params = new URLSearchParams();
     if (projectIds !== undefined) {
       for (const projectId of projectIds) {
@@ -2155,13 +2157,16 @@ export class Client implements LangSmithTracingClientInterface {
       });
       params.append("reference_dataset", dataset.id);
     }
+    if (datasetVersion !== undefined) {
+      params.append("dataset_version", datasetVersion);
+    }
     if (referenceFree !== undefined) {
       params.append("reference_free", referenceFree.toString());
     }
     if (metadata !== undefined) {
       params.append("metadata", JSON.stringify(metadata));
     }
-    for await (const projects of this._getPaginated<TracerSession>(
+    for await (const projects of this._getPaginated<TracerSessionResult>(
       "/sessions",
       params
     )) {
