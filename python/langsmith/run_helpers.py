@@ -59,8 +59,6 @@ _PARENT_RUN_TREE = contextvars.ContextVar[Optional[run_trees.RunTree]](
 _PROJECT_NAME = contextvars.ContextVar[Optional[str]]("_PROJECT_NAME", default=None)
 _TAGS = contextvars.ContextVar[Optional[List[str]]]("_TAGS", default=None)
 _METADATA = contextvars.ContextVar[Optional[Dict[str, Any]]]("_METADATA", default=None)
-
-
 _TRACING_ENABLED = contextvars.ContextVar[Optional[Union[bool, Literal["local"]]]](
     "_TRACING_ENABLED", default=None
 )
@@ -73,6 +71,10 @@ _CONTEXT_KEYS: Dict[str, contextvars.ContextVar] = {
     "enabled": _TRACING_ENABLED,
     "client": _CLIENT,
 }
+
+_ON_RUN_SET = contextvars.ContextVar[Optional["_Collector"]](
+    "_ON_RUN_SET", default=None
+)
 
 
 def get_current_run_tree() -> Optional[run_trees.RunTree]:
@@ -945,11 +947,15 @@ class trace:
         if enabled is True:
             self.new_run.post()
         if enabled:
-            _TAGS.set(tags_)
-            _METADATA.set(metadata)
-            _PARENT_RUN_TREE.set(self.new_run)
-            _PROJECT_NAME.set(project_name_)
-            _CLIENT.set(client_)
+            _set_tracing_context(
+                {
+                    "tags": tags_,
+                    "metadata": metadata,
+                    "parent": self.new_run,
+                    "project_name": project_name_,
+                    "client": client_,
+                }
+            )
 
         return self.new_run
 
@@ -1434,8 +1440,13 @@ def _setup_run(
         on_end=langsmith_extra.get("on_end"),
         context=context,
     )
-    context.run(_PROJECT_NAME.set, response_container["project_name"])
-    context.run(_PARENT_RUN_TREE.set, response_container["new_run"])
+    context.run(
+        _set_tracing_context,
+        {
+            "project_name": response_container["project_name"],
+            "parent": response_container["new_run"],
+        },
+    )
     return response_container
 
 
@@ -1537,6 +1548,10 @@ def _get_inputs_and_attachments_safe(
 def _set_tracing_context(context: Dict[str, Any]):
     """Set the tracing context."""
     for k, v in context.items():
+        if k == "parent":
+            cb = _ON_RUN_SET.get()
+            if cb is not None:
+                cb(v)
         var = _CONTEXT_KEYS[k]
         var.set(v)
 
@@ -1774,3 +1789,35 @@ def _get_function_result(results: list, reduce_fn: Callable) -> Any:
                 return results
         else:
             return results
+
+
+class _Collector:
+    """Collect runs set in contex."""
+
+    __slots__ = ("parent_run_id", "runs")
+
+    def __init__(self, parent_run_id: Optional[uuid.UUID]):
+        """Construct callback."""
+        self.parent_run_id = parent_run_id
+        self.runs = []
+
+    def __call__(self, run: Optional[schemas.Run]):
+        """Add a run."""
+        try:
+            if run is None:
+                return
+            if run.parent_run_id == self.parent_run_id:
+                self.runs.append(run)
+        except Exception:
+            pass
+
+
+@contextlib.contextmanager
+def _on_run_set() -> Generator[_Collector, None, None]:
+    parent_run_tree = _PARENT_RUN_TREE.get()
+    parent_run_id = parent_run_tree.run_id if parent_run_tree else None
+    collector = _Collector(parent_run_id)
+    prev = _ON_RUN_SET.get()
+    _ON_RUN_SET.set(collector)
+    yield collector
+    _ON_RUN_SET.set(prev)

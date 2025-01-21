@@ -8,6 +8,7 @@ import datetime
 import logging
 import pathlib
 import uuid
+from contextlib import ExitStack
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -784,15 +785,21 @@ class _AsyncExperimentManager(_ExperimentManagerMixin):
             **(current_context["metadata"] or {}),
             **{"experiment": self.experiment_name},
         }
-        with rh.tracing_context(
-            **{
-                **current_context,
-                "project_name": "evaluators",
-                "metadata": metadata,
-                "enabled": "local" if not self._upload_results else True,
-                "client": self.client,
-            }
-        ):
+        stack = ExitStack()
+
+        stack.enter_context(
+            rh.tracing_context(
+                **{
+                    **current_context,
+                    "project_name": "evaluators",
+                    "metadata": metadata,
+                    "enabled": "local" if not self._upload_results else True,
+                    "client": self.client,
+                }
+            )
+        )
+        run_collector = stack.enter_context(rh._on_run_set())
+        with stack:
             run = current_results["run"]
             example = current_results["example"]
             eval_results = current_results["evaluation_results"]
@@ -812,14 +819,17 @@ class _AsyncExperimentManager(_ExperimentManagerMixin):
                 except Exception as e:
                     try:
                         feedback_keys = _extract_feedback_keys(evaluator)
+                        source_run_id = (
+                            run_collector.runs[-1].id if run_collector.runs else None
+                        )
 
                         error_response = EvaluationResults(
                             results=[
                                 EvaluationResult(
                                     key=key,
-                                    source_run_id=run.id,
                                     comment=repr(e),
-                                    extra={"error": True},
+                                    source_run_id=source_run_id,
+                                    error=True,
                                 )
                                 for key in feedback_keys
                             ]
@@ -839,11 +849,7 @@ class _AsyncExperimentManager(_ExperimentManagerMixin):
                         f" run {run.id}: {repr(e)}",
                         exc_info=True,
                     )
-                    logger.error(
-                        f"Error running evaluator {repr(evaluator)} on"
-                        f" run {run.id}: {repr(e)}",
-                        exc_info=True,
-                    )
+                    run_collector.runs.clear()
                 if example.attachments is not None:
                     for attachment in example.attachments:
                         reader = example.attachments[attachment]["reader"]
