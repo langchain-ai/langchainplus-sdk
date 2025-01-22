@@ -7,6 +7,7 @@ import collections
 import concurrent.futures as cf
 import datetime
 import functools
+import importlib
 import inspect
 import io
 import itertools
@@ -14,6 +15,7 @@ import logging
 import pathlib
 import queue
 import random
+import sys
 import textwrap
 import threading
 import uuid
@@ -90,6 +92,9 @@ AEVALUATOR_T = Union[
     ],
 ]
 EXPERIMENT_T = Union[str, uuid.UUID, schemas.TracerSession]
+
+_IS_INTERACTIVE_ENV = hasattr(sys, "ps2")
+_IPYTHON_INSTALLED = importlib.util.find_spec("IPython")
 
 
 @overload
@@ -1268,15 +1273,25 @@ class _ExperimentManagerMixin:
                 f"{base_url}/datasets/{dataset_id}/compare?"
                 f"selectedSessions={project.id}"
             )
+        else:
+            comparison_url = None
+
+        if _IS_INTERACTIVE_ENV and _IPYTHON_INSTALLED and comparison_url:
+            from IPython.display import HTML, display  # type: ignore[import-not-found]
+
+            display(
+                HTML(
+                    f"RUNNING EXPERIMENT: <a href='{comparison_url}'>"
+                    f"{self.experiment_name}</a>"
+                )
+            )
+        elif comparison_url:
             print(  # noqa: T201
-                f"View the evaluation results for experiment: '{self.experiment_name}'"
-                f" at:\n{comparison_url}\n\n"
+                f"RUNNING EXPERIMENT: {self.experiment_name}\nEXPERIMENT URL: "
+                f"{comparison_url}"
             )
         else:
-            # HACKHACK
-            print(  # noqa: T201
-                "Starting evaluation of experiment: %s", self.experiment_name
-            )
+            print(f"RUNNING EXPERIMENT: {self.experiment_name}")  # noqa: T201
 
 
 class _ExperimentManager(_ExperimentManagerMixin):
