@@ -435,6 +435,12 @@ class Run(RunBase):
 
     parent_run_ids: Optional[List[UUID]] = None
     """List of parent run IDs."""
+    inputs_s3_urls: Optional[dict] = None
+    """Dictionary of presigned URLs for input data stored in blob storage, typically for multimedia in LLM runs."""
+    outputs_s3_urls: Optional[dict] = None
+    """Dictionary of presigned URLs for output data stored in blob storage, typically for multimedia in LLM runs."""
+    s3_urls: Optional[dict] = None
+    """Dictionary of presigned URLs for attachments and oversized extra/error values stored in blob storage."""
     trace_id: UUID
     """Unique ID assigned to every run within this nested trace."""
     dotted_order: str = Field(default="")

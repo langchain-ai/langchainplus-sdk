@@ -206,11 +206,14 @@ export interface Run extends BaseRun {
   /** Whether the run is included in a dataset. */
   in_dataset?: boolean;
 
-  /** The output S3 URLs */
-  outputs_s3_urls?: S3URL;
+  /** Dictionary of presigned URLs for output data stored in blob storage, typically for multimedia in LLM runs. */
+  outputs_s3_urls?: Record<string, string>;
 
-  /** The input S3 URLs */
-  inputs_s3_urls?: S3URL;
+  /** Dictionary of presigned URLs for input data stored in blob storage, typically for multimedia in LLM runs. */
+  inputs_s3_urls?: Record<string, string>;
+
+  /** Dictionary of presigned URLs for attachments and oversized extra/error values stored in blob storage. */
+  s3_urls?: Record<string, string>;
 }
 
 export interface RunCreate extends BaseRun {

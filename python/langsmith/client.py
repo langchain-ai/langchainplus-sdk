@@ -2136,7 +2136,11 @@ class Client:
         return run
 
     def read_run(
-        self, run_id: ID_TYPE, load_child_runs: bool = False
+        self,
+        run_id: ID_TYPE,
+        load_child_runs: bool = False,
+        *,
+        exclude_s3_stored_attributes: Optional[bool] = None,
     ) -> ls_schemas.Run:
         """Read a run from the LangSmith API.
 
@@ -2159,8 +2163,13 @@ class Client:
                 client = Client()
                 stored_run = client.read_run(run_id)
         """
+        params = (
+            None
+            if exclude_s3_stored_attributes is None
+            else {"exclude_s3_stored_attributes": exclude_s3_stored_attributes}
+        )
         response = self.request_with_retries(
-            "GET", f"/runs/{_as_uuid(run_id, 'run_id')}"
+            "GET", f"/runs/{_as_uuid(run_id, 'run_id')}", params=params
         )
         attachments = _convert_stored_attachments_to_attachments_dict(
             response.json(), attachments_key="s3_urls"

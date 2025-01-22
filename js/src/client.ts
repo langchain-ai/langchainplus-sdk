@@ -1305,10 +1305,22 @@ export class Client implements LangSmithTracingClientInterface {
 
   public async readRun(
     runId: string,
-    { loadChildRuns }: { loadChildRuns: boolean } = { loadChildRuns: false }
+    {
+      loadChildRuns = false,
+      excludeS3StoredAttributes,
+    }: {
+      loadChildRuns?: boolean;
+      excludeS3StoredAttributes?: boolean;
+    } = {}
   ): Promise<Run> {
     assertUuid(runId);
-    let run = await this._get<Run>(`/runs/${runId}`);
+    const params =
+      excludeS3StoredAttributes !== undefined
+        ? new URLSearchParams({
+            exclude_s3_stored_attributes: excludeS3StoredAttributes.toString(),
+          })
+        : undefined;
+    let run = await this._get<Run>(`/runs/${runId}`, params);
     if (loadChildRuns && run.child_run_ids) {
       run = await this._loadChildRuns(run);
     }
