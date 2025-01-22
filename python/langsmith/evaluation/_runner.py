@@ -650,6 +650,7 @@ def evaluate_comparative(
     metadata: Optional[dict] = None,
     load_nested: bool = False,
     randomize_order: bool = False,
+    upload_results: bool = True,
 ) -> ComparativeExperimentResults:
     r"""Evaluate existing experiment runs against each other.
 
@@ -674,6 +675,8 @@ def evaluate_comparative(
             Default is to only load the top-level root runs.
         randomize_order (bool): Whether to randomize the order of the outputs for each evaluation.
             Default is False.
+        upload_results (bool): Whether to upload the results to LangSmith.
+            Default is True.
 
     Returns:
         ComparativeExperimentResults: The results of the comparative evaluation.
@@ -909,6 +912,7 @@ def evaluate_comparative(
 
     comparators = [comparison_evaluator(evaluator) for evaluator in evaluators or []]
     results: dict = {}
+    tracing_mode = "local" if not upload_results else True
 
     def evaluate_and_submit_feedback(
         runs_list: list[schemas.Run],
@@ -919,10 +923,26 @@ def evaluate_comparative(
         feedback_group_id = uuid.uuid4()
         if randomize_order:
             random.shuffle(runs_list)
-        with rh.tracing_context(project_name="evaluators", client=client):
+        current_context = rh.get_tracing_context()
+        metadata = (current_context["metadata"] or {}) | {
+            "experiment": comparative_experiment.name,
+            "experiment_id": comparative_experiment.id,
+            "reference_example_id": example.id,
+            "reference_run_ids": [r.id for r in runs_list],
+        }
+        with rh.tracing_context(
+            **(
+                current_context
+                | {
+                    "project_name": "evaluators",
+                    "metadata": metadata,
+                    "enabled": tracing_mode,
+                    "client": client,
+                }
+            )
+        ):
             result = comparator.compare_runs(runs_list, example)
-            if client is None:
-                raise ValueError("Client is required to submit feedback.")
+
         comments = (
             {str(rid): result.comment for rid in result.scores}
             if isinstance(result.comment, str)
@@ -1610,22 +1630,21 @@ class _ExperimentManager(_ExperimentManagerMixin):
         executor: cf.ThreadPoolExecutor,
     ) -> ExperimentResultRow:
         current_context = rh.get_tracing_context()
-        metadata = {
-            **(current_context["metadata"] or {}),
-            **{
-                "experiment": self.experiment_name,
-                "reference_example_id": current_results["example"].id,
-                "reference_run_id": current_results["run"].id,
-            },
+        metadata = (current_context["metadata"] or {}) | {
+            "experiment": self.experiment_name,
+            "reference_example_id": current_results["example"].id,
+            "reference_run_id": current_results["run"].id,
         }
         with rh.tracing_context(
-            **{
-                **current_context,
-                "project_name": "evaluators",
-                "metadata": metadata,
-                "enabled": "local" if not self._upload_results else True,
-                "client": self.client,
-            }
+            **(
+                current_context
+                | {
+                    "project_name": "evaluators",
+                    "metadata": metadata,
+                    "enabled": "local" if not self._upload_results else True,
+                    "client": self.client,
+                }
+            )
         ):
             run = current_results["run"]
             example = current_results["example"]
@@ -1743,16 +1762,13 @@ class _ExperimentManager(_ExperimentManagerMixin):
         with ls_utils.ContextThreadPoolExecutor() as executor:
             project_id = self._get_experiment().id if self._upload_results else None
             current_context = rh.get_tracing_context()
-            metadata = {
-                **(current_context["metadata"] or {}),
-                **{
-                    "experiment": self.experiment_name,
-                    "experiment_id": project_id,
-                },
+            metadata = (current_context["metadata"] or {}) | {
+                "experiment": self.experiment_name,
+                "experiment_id": project_id,
             }
             with rh.tracing_context(
-                **{
-                    **current_context,
+                current_context
+                | {
                     "project_name": "evaluators",
                     "metadata": metadata,
                     "client": self.client,
