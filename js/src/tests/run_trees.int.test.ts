@@ -149,8 +149,8 @@ test.concurrent(
   "Test list runs multi project",
   async () => {
     const projectNames = [
-      "__My JS Tracer Project - test_list_runs_multi_project",
-      "__My JS Tracer Project - test_list_runs_multi_project2",
+      `__My JS Tracer Project - test_list_runs_multi_project_${uuid.v4()}`,
+      `__My JS Tracer Project - test_list_runs_multi_project2_${uuid.v4()}`,
     ];
 
     try {
