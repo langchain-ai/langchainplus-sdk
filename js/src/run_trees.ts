@@ -22,7 +22,7 @@ function stripNonAlphanumeric(input: string) {
 }
 
 export function convertToDottedOrderFormat(
-  epoch: number,
+  epoch: number | string,
   runId: string,
   executionOrder = 1
 ) {
@@ -163,8 +163,8 @@ export class RunTree implements BaseRun {
   project_name: string;
   parent_run?: RunTree;
   child_runs: RunTree[];
-  start_time: number;
-  end_time?: number;
+  start_time: number | string;
+  end_time?: number | string;
   extra: KVMap;
   tags?: string[];
   error?: string;

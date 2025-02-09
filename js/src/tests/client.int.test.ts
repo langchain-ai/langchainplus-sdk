@@ -500,6 +500,7 @@ test.concurrent(
       id: runId,
       name: "foo",
       run_type: "llm",
+      start_time: new Date().toISOString(),
       inputs: { input: "hello world" },
       outputs: { output: "hi there" },
     };

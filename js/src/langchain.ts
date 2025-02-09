@@ -71,7 +71,7 @@ export async function getLangchainCallbacks(
     if (!current || visited.has(current.id)) continue;
     visited.add(current.id);
 
-    runMap.set(current.id, current);
+    runMap.set(current.id, current as Run);
     if (current.child_runs) {
       queue.push(...current.child_runs);
     }

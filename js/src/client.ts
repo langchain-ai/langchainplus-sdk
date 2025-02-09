@@ -238,8 +238,8 @@ interface CreateRunParams {
   inputs: KVMap;
   run_type: string;
   id?: string;
-  start_time?: number;
-  end_time?: number;
+  start_time?: number | string;
+  end_time?: number | string;
   extra?: KVMap;
   error?: string;
   serialized?: object;

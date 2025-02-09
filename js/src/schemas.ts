@@ -91,13 +91,13 @@ export interface BaseRun {
   name: string;
 
   /** The epoch time at which the run started, if available. */
-  start_time?: number;
+  start_time?: number | string;
 
   /** Specifies the type of run (tool, chain, llm, etc.). */
   run_type: string;
 
   /** The epoch time at which the run ended, if applicable. */
-  end_time?: number;
+  end_time?: number | string;
 
   /** Any additional metadata or settings for the run. */
   extra?: KVMap;
@@ -170,6 +170,10 @@ export interface Run extends BaseRun {
   /** The ID of the project that owns this run. */
   session_id?: string;
 
+  start_time: string;
+
+  end_time?: string;
+
   /** IDs of any child runs spawned by this run. */
   child_run_ids?: string[];
 
@@ -221,7 +225,7 @@ export interface RunCreate extends BaseRun {
 
 export interface RunUpdate {
   id?: string;
-  end_time?: number;
+  end_time?: number | string;
   extra?: KVMap;
   tags?: string[];
   error?: string;
@@ -577,6 +581,12 @@ export interface RunWithAnnotationQueueInfo extends BaseRun {
 
   /** The time this run was added to the queue. */
   added_at?: string;
+
+  /** The ISO 8601 formatted string representing the start time of the run. */
+  start_time: string;
+
+  /** The ISO 8601 formatted string representing the end time of the run, if available. */
+  end_time?: string;
 }
 
 /**
