@@ -713,7 +713,7 @@ export class Client implements LangSmithTracingClientInterface {
     path: string,
     body: RecordStringAny | null = null,
     requestMethod = "POST",
-    dataKey = "runs"
+    dataKey?: string
   ): AsyncIterable<T[]> {
     const bodyParams = body ? { ...body } : {};
     while (true) {
@@ -732,10 +732,15 @@ export class Client implements LangSmithTracingClientInterface {
       if (!responseBody) {
         break;
       }
-      if (!responseBody[dataKey]) {
-        break;
+      if (dataKey) {
+        if (!responseBody[dataKey]) {
+          break;
+        }
+        yield responseBody[dataKey];
+      } else {
+        yield responseBody;
       }
-      yield responseBody[dataKey];
+
       const cursors = responseBody.cursors;
       if (!cursors) {
         break;
@@ -1560,7 +1565,9 @@ export class Client implements LangSmithTracingClientInterface {
     let runsYielded = 0;
     for await (const runs of this._getCursorPaginatedList<Run>(
       "/runs/query",
-      body
+      body,
+      "POST",
+      "runs"
     )) {
       if (limit) {
         if (runsYielded >= limit) {
@@ -2834,6 +2841,71 @@ export class Client implements LangSmithTracingClientInterface {
       );
     }
     return example;
+  }
+
+  /**
+   * Reads examples with runs from a dataset.
+   *
+   * @param {string} datasetId - The ID of the dataset.
+   * @param {Object} options - The options for reading examples.
+   * @param {string[]} options.sessionIds - The session IDs.
+   * @param {string} [options.comparativeExperimentId] - The comparative experiment ID.
+   * @param {KVMap} [options.filters] - The filters to apply.
+   * @param {boolean} [options.preview=false] - Whether to preview the examples.
+   * @param {number} [options.offset=0] - The offset for pagination.
+   * @param {number} [options.limit=20] - The limit for pagination.
+   * @returns {AsyncIterable<Example>} An async iterable of examples.
+   * @throws {Error} If the dataset ID or any session ID is invalid.
+   */
+  public async *readExamplesWithRuns(
+    datasetId: string,
+    sessionIds: string[],
+    {
+      comparativeExperimentId,
+      filters,
+      preview = false,
+      offset = 0,
+      limit = 20,
+    }: {
+      comparativeExperimentId?: string;
+      filters?: KVMap;
+      preview?: boolean;
+      offset?: number;
+      limit?: number;
+    }
+  ): AsyncIterable<Example> {
+    assertUuid(datasetId);
+    const endpoint = `/datasets/${datasetId}/runs`;
+    sessionIds.forEach((id) => assertUuid(id));
+    const body: RecordStringAny = {
+      session_ids: sessionIds,
+      comparative_experiment_id: comparativeExperimentId,
+      filters,
+      preview,
+      offset,
+      limit,
+    };
+
+    let examplesYielded = 0;
+    for await (const exampleWithRuns of this._getCursorPaginatedList<Example>(
+      endpoint,
+      body
+    )) {
+      if (limit) {
+        if (exampleWithRuns.length + examplesYielded > limit) {
+          const newRuns = exampleWithRuns.slice(0, limit - examplesYielded);
+          yield* newRuns;
+          break;
+        }
+        examplesYielded += exampleWithRuns.length;
+        yield* exampleWithRuns;
+        if (examplesYielded >= limit) {
+          break;
+        }
+      } else {
+        yield* exampleWithRuns;
+      }
+    }
   }
 
   public async *listExamples({
