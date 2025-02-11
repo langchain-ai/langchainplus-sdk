@@ -59,7 +59,7 @@ async def test_openai_says_hello():
     reason="LANGSMITH_TRACING environment variable not set",
 )
 @pytest.mark.xfail(reason="Test failure output case")
-@pytest.mark.langsmith(output_keys=["expected"])
+@pytest.mark.langsmith(reference_output_keys=["expected"])
 @pytest.mark.parametrize(
     "a, b, expected",
     [
@@ -98,7 +98,7 @@ def reference_outputs() -> int:
     not os.getenv("LANGSMITH_TRACING"),
     reason="LANGSMITH_TRACING environment variable not set",
 )
-@pytest.mark.langsmith(output_keys=["reference_outputs"])
+@pytest.mark.langsmith(reference_output_keys=["reference_outputs"])
 def test_fixture(inputs: int, reference_outputs: int):
     result = 2 * inputs
     t.log_outputs({"d": result})

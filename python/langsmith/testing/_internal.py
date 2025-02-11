@@ -69,6 +69,7 @@ def test(
     *,
     id: Optional[uuid.UUID] = None,
     output_keys: Optional[Sequence[str]] = None,
+    reference_output_keys: Optional[Sequence[str]] = None,
     client: Optional[ls_client.Client] = None,
     test_suite_name: Optional[str] = None,
 ) -> Callable[[Callable], Callable]: ...
@@ -86,9 +87,13 @@ def test(*args: Any, **kwargs: Any) -> Callable:
         - id (Optional[uuid.UUID]): A unique identifier for the test case. If not
             provided, an ID will be generated based on the test function's module
             and name.
-        - output_keys (Optional[Sequence[str]]): A list of keys to be considered as
-            the output keys for the test case. These keys will be extracted from the
-            test function's inputs and stored as the expected outputs.
+        - output_keys (Optional[Sequence[str]], deprecated): Use
+            "reference_output_keys" instead. A list of keys to be considered as the
+            output keys for the test case.
+        - reference_output_keys (Optional[Sequence[str]]): A list of keys to be
+            considered as the reference output keys for the test case. These keys
+            will be extracted from the test function's inputs and stored as the
+            expected outputs.
         - client (Optional[ls_client.Client]): An instance of the LangSmith client
             to be used for communication with the LangSmith service. If not provided,
             a default client will be used.
@@ -238,7 +243,7 @@ def test(*args: Any, **kwargs: Any) -> Callable:
             import pytest
 
 
-            @pytest.mark.langsmith(output_keys=["expected"])
+            @pytest.mark.langsmith(reference_output_keys=["expected"])
             @pytest.mark.parametrize(
                 "a, b, expected",
                 [
@@ -266,7 +271,7 @@ def test(*args: Any, **kwargs: Any) -> Callable:
                 assert 3 * 4 == 12
 
         By default, all test inputs are saved as "inputs" to a dataset.
-        You can specify the `output_keys` argument to persist those keys
+        You can specify the `reference_output_keys` argument to persist those keys
         within the dataset's "outputs" fields.
 
         .. code-block:: python
@@ -279,7 +284,7 @@ def test(*args: Any, **kwargs: Any) -> Callable:
                 return "input"
 
 
-            @pytest.mark.langsmith(output_keys=["expected_output"])
+            @pytest.mark.langsmith(reference_output_keys=["expected_output"])
             def test_with_expected_output(some_input: str, expected_output: str):
                 assert expected_output in some_input
 
@@ -297,9 +302,18 @@ def test(*args: Any, **kwargs: Any) -> Callable:
             test_openai_says_hello()
             test_addition_with_multiple_inputs(1, 2, 3)
     """
+    if "output_keys" in kwargs:
+        warnings.warn(
+            "The `output_keys` keyword argument is deprecated."
+            "Please use `reference_output_keys` instead.",
+            DeprecationWarning,
+        )
+        reference_output_keys = kwargs.pop("output_keys")
+    else:
+        reference_output_keys = kwargs.pop("reference_output_keys", None)
     langtest_extra = _UTExtra(
         id=kwargs.pop("id", None),
-        output_keys=kwargs.pop("output_keys", None),
+        reference_output_keys=reference_output_keys,
         client=kwargs.pop("client", None),
         test_suite_name=kwargs.pop("test_suite_name", None),
         cache=ls_utils.get_cache_dir(kwargs.pop("cache", None)),
@@ -789,7 +803,7 @@ _TEST_CASE = contextvars.ContextVar[Optional[_TestCase]]("_TEST_CASE", default=N
 class _UTExtra(TypedDict, total=False):
     client: Optional[ls_client.Client]
     id: Optional[uuid.UUID]
-    output_keys: Optional[Sequence[str]]
+    reference_output_keys: Optional[Sequence[str]]
     test_suite_name: Optional[str]
     cache: Optional[str]
 
@@ -810,19 +824,19 @@ def _create_test_case(
     **kwargs: Any,
 ) -> _TestCase:
     client = langtest_extra["client"] or rt.get_cached_client()
-    output_keys = langtest_extra["output_keys"]
+    reference_output_keys = langtest_extra["reference_output_keys"]
     signature = inspect.signature(func)
     inputs = rh._get_inputs_safe(signature, *args, **kwargs) or None
     outputs = None
-    if output_keys:
+    if reference_output_keys:
         outputs = {}
         if not inputs:
             msg = (
-                "'output_keys' should only be specified when marked test function has "
-                "input arguments."
+                "`reference_output_keys` should only be specified when",
+                "marked test function has input arguments.",
             )
             raise ValueError(msg)
-        for k in output_keys:
+        for k in reference_output_keys:
             outputs[k] = inputs.pop(k, None)
     test_suite = _LangSmithTestSuite.from_test(
         client, func, langtest_extra.get("test_suite_name")
