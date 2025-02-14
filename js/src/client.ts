@@ -3351,7 +3351,10 @@ export class Client implements LangSmithTracingClientInterface {
   } = {}): AsyncIterable<Feedback> {
     const queryParams = new URLSearchParams();
     if (runIds) {
-      queryParams.append("run", runIds.join(","));
+      for (const runId of runIds) {
+        assertUuid(runId);
+        queryParams.append("run", runId);
+      }
     }
     if (feedbackKeys) {
       for (const key of feedbackKeys) {
