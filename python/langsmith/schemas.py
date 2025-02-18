@@ -51,14 +51,18 @@ class Attachment(NamedTuple):
     """Annotated type that will be stored as an attachment if used.
 
     Examples:
-        --------
+
         .. code-block:: python
 
-        @traceable
-        def my_function(bar: int, my_val: Attachment):
-            # my_val will be stored as an attachment
-            # bar will be stored as inputs
-            return bar
+            from langsmith import traceable
+            from langsmith.schemas import Attachment
+
+
+            @traceable
+            def my_function(bar: int, my_val: Attachment):
+                # my_val will be stored as an attachment
+                # bar will be stored as inputs
+                return bar
     """
 
     mime_type: str
@@ -91,7 +95,7 @@ class ExampleBase(BaseModel):
     """Example base model."""
 
     dataset_id: UUID
-    inputs: Dict[str, Any] = Field(default_factory=dict)
+    inputs: Optional[Dict[str, Any]] = Field(default=None)
     outputs: Optional[Dict[str, Any]] = Field(default=None)
     metadata: Optional[Dict[str, Any]] = Field(default=None)
 
@@ -102,27 +106,39 @@ class ExampleBase(BaseModel):
         arbitrary_types_allowed = True
 
 
-class ExampleCreate(ExampleBase):
-    """Example create model."""
-
-    id: Optional[UUID]
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    split: Optional[Union[str, List[str]]] = None
+class _AttachmentDict(TypedDict):
+    mime_type: str
+    data: Union[bytes, Path]
 
 
-class ExampleUploadWithAttachments(BaseModel):
+_AttachmentLike = Union[
+    Attachment, _AttachmentDict, Tuple[str, bytes], Tuple[str, Path]
+]
+
+
+class ExampleCreate(BaseModel):
     """Example upload with attachments."""
 
     id: Optional[UUID]
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    inputs: Dict[str, Any] = Field(default_factory=dict)
+    inputs: Optional[Dict[str, Any]] = Field(default=None)
     outputs: Optional[Dict[str, Any]] = Field(default=None)
     metadata: Optional[Dict[str, Any]] = Field(default=None)
     split: Optional[Union[str, List[str]]] = None
-    attachments: Optional[Attachments] = None
+    attachments: Optional[dict[str, _AttachmentLike]] = None
+    use_source_run_io: bool = False
+    use_source_run_attachments: Optional[List[str]] = None
+    source_run_id: Optional[UUID] = None
+
+    def __init__(self, **data):
+        """Initialize from dict."""
+        super().__init__(**data)
 
 
-class ExampleUpsertWithAttachments(ExampleUploadWithAttachments):
+ExampleUploadWithAttachments = ExampleCreate
+
+
+class ExampleUpsertWithAttachments(ExampleCreate):
     """Example create with attachments."""
 
     dataset_id: UUID
@@ -197,31 +213,28 @@ class AttachmentsOperations(BaseModel):
 
 
 class ExampleUpdate(BaseModel):
-    """Update class for Example."""
+    """Example update with attachments."""
 
+    id: UUID
     dataset_id: Optional[UUID] = None
-    inputs: Optional[Dict[str, Any]] = None
-    outputs: Optional[Dict[str, Any]] = None
-    attachments_operations: Optional[AttachmentsOperations] = None
-    metadata: Optional[Dict[str, Any]] = None
+    inputs: Optional[Dict[str, Any]] = Field(default=None)
+    outputs: Optional[Dict[str, Any]] = Field(default=None)
+    metadata: Optional[Dict[str, Any]] = Field(default=None)
     split: Optional[Union[str, List[str]]] = None
+    attachments: Optional[Attachments] = None
+    attachments_operations: Optional[AttachmentsOperations] = None
 
     class Config:
         """Configuration class for the schema."""
 
         frozen = True
 
+    def __init__(self, **data):
+        """Initialize from dict."""
+        super().__init__(**data)
 
-class ExampleUpdateWithAttachments(ExampleUpdate):
-    """Example update with attachments."""
 
-    id: UUID
-    inputs: Dict[str, Any] = Field(default_factory=dict)
-    outputs: Optional[Dict[str, Any]] = Field(default=None)
-    metadata: Optional[Dict[str, Any]] = Field(default=None)
-    split: Optional[Union[str, List[str]]] = None
-    attachments: Optional[Attachments] = None
-    attachments_operations: Optional[AttachmentsOperations] = None
+ExampleUpdateWithAttachments = ExampleUpdate
 
 
 class DataType(str, Enum):

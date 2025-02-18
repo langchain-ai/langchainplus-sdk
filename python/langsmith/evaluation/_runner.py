@@ -2255,7 +2255,7 @@ def _flatten_experiment_results(
 ):
     return [
         {
-            **{f"inputs.{k}": v for k, v in x["example"].inputs.items()},
+            **{f"inputs.{k}": v for k, v in (x["example"].inputs or {}).items()},
             **{f"outputs.{k}": v for k, v in (x["run"].outputs or {}).items()},
             "error": x["run"].error,
             **(
