@@ -2699,16 +2699,21 @@ export class Client implements LangSmithTracingClientInterface {
       datasetId_ = dataset.id;
     }
 
-    const createdAt_ = createdAt || new Date();
+    // Note: the created at time will be added by the langsmith server when not provided.
+    // This will ensure the timestamp will be of the standard langsmith datetime format.
+    // 2025-01-10T14:43:55.017298+00:00 i.e with 6 digits for fractional seconds.
+    const createdAt_ = createdAt
+      ? new Date(createdAt).toISOString()
+      : undefined;
     const data: ExampleCreate = {
       dataset_id: datasetId_,
       inputs,
       outputs,
-      created_at: createdAt_?.toISOString(),
       id: exampleId,
       metadata,
       split,
       source_run_id: sourceRunId,
+      ...(createdAt_ && { created_at: createdAt_ }),
     };
 
     const response = await this.caller.call(
