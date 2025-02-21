@@ -57,7 +57,12 @@ describe.each([[""], ["mocked"]])("Client uses %s fetch", (description) => {
   describe("createLLMExample", () => {
     it("should create an example with the given input and generation", async () => {
       const client = new Client({ apiKey: "test-api-key" });
-
+      jest.spyOn(client as any, "_getServerInfo").mockImplementation(() => {
+        return {
+          version: "foo",
+          instance_flags: { dataset_examples_multipart_enabled: true },
+        };
+      });
       const input = "Hello, world!";
       const generation = "Bonjour, monde!";
       const options = { datasetName: "test-dataset" };
@@ -71,6 +76,12 @@ describe.each([[""], ["mocked"]])("Client uses %s fetch", (description) => {
   describe("createChatExample", () => {
     it("should convert LangChainBaseMessage objects to examples", async () => {
       const client = new Client({ apiKey: "test-api-key" });
+      jest.spyOn(client as any, "_getServerInfo").mockImplementation(() => {
+        return {
+          version: "foo",
+          instance_flags: { dataset_examples_multipart_enabled: true },
+        };
+      });
       const input = [
         { text: "Hello", sender: "user" },
         { text: "Hi there", sender: "bot" },

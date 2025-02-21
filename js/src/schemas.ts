@@ -255,13 +255,7 @@ export interface RunUpdate {
   attachments?: Attachments;
 }
 
-export interface ExampleCreate extends BaseExample {
-  id?: string;
-  created_at?: string;
-  split?: string | string[];
-}
-
-export interface ExampleUploadWithAttachments {
+export interface ExampleCreate {
   id?: string;
   inputs: KVMap;
   outputs?: KVMap;
@@ -269,9 +263,15 @@ export interface ExampleUploadWithAttachments {
   split?: string | string[];
   attachments?: Attachments;
   created_at?: string;
+  dataset_id?: string;
+  dataset_name?: string;
+  source_run_id?: string;
+  use_source_run_io?: boolean;
+  use_source_run_attachments?: string[];
 }
 
-export interface ExampleUpdateWithAttachments {
+export interface ExampleUploadWithAttachments extends ExampleCreate {}
+export interface ExampleUpdate {
   id: string;
   inputs?: KVMap;
   outputs?: KVMap;
@@ -279,7 +279,12 @@ export interface ExampleUpdateWithAttachments {
   split?: string | string[];
   attachments?: Attachments;
   attachments_operations?: KVMap;
+  dataset_id?: string;
 }
+
+export interface ExampleUpdateWithoutId extends Omit<ExampleUpdate, "id"> {}
+
+export interface ExampleUpdateWithAttachments extends ExampleUpdate {}
 
 export interface UploadExamplesResponse {
   count: number;
@@ -312,17 +317,7 @@ export interface RawExample extends BaseExample {
   attachment_urls?: Record<string, RawAttachmentInfo>;
 }
 
-export interface ExampleUpdate {
-  dataset_id?: string;
-  inputs?: KVMap;
-  outputs?: KVMap;
-  metadata?: KVMap;
-  split?: string | string[];
-}
-
-export interface ExampleUpdateWithId extends ExampleUpdate {
-  id: string;
-}
+export interface ExampleUpdateWithId extends ExampleUpdate {}
 
 export interface ExampleSearch extends BaseExample {
   id: string;
