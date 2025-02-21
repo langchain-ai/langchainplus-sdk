@@ -330,7 +330,29 @@ def wrap_openai(
     Returns:
         Union[OpenAI, AsyncOpenAI]: The patched client.
 
-    """
+    Example:
+
+        .. code-block:: python
+
+            import openai
+            from langsmith import wrappers
+
+            client = wrappers.wrap_openai(openai.OpenAI())
+
+            # Use OpenAI client same as you normally would:
+            messages = [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {
+                    "role": "user",
+                    "content": "What physics breakthroughs do you predict will happen by 2300?",
+                },
+            ]
+            completion = client.chat.completions.create(
+                model="gpt-4o-mini", messages=messages
+            )
+            print(completion.choices[0].message.content)
+
+    """  # noqa: E501
     client.chat.completions.create = _get_wrapper(  # type: ignore[method-assign]
         client.chat.completions.create,
         chat_name,

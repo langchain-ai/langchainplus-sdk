@@ -46,6 +46,7 @@ runs:
         LANGSMITH_ENDPOINT: https://beta.api.smith.langchain.com
         LANGSMITH_API_KEY: ${{ inputs.langchain-api-key-beta }}
         OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
         LANGSMITH_TEST_CACHE: tests/cassettes
       run: make integration_tests_fast
       shell: bash

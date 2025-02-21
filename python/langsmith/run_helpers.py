@@ -672,6 +672,7 @@ def traceable(
                 )
                 raise e
             _on_run_end(run_container, outputs=_get_function_result(results, reduce_fn))
+
             return function_return
 
         # "Stream" functions (used in methods like OpenAI/Anthropic's SDKs)
